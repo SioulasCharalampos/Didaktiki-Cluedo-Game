@@ -1,5 +1,5 @@
-// questions.js
-const questions = [
+// questions_networks.js
+const networkQuestions = [
     {
         id: 1,
         question: "Το μοντέλο OSI έχει 4 επίπεδα, ενώ το μοντέλο TCP/IP έχει 7 επίπεδα.",
@@ -141,5 +141,6 @@ const questions = [
         explanation: "Εμφανίζει όλες τις ενεργές συνδέσεις και τις ανοιχτές θύρες του συστήματος."
     }
 ];
+
 
 module.exports = networkQuestions;

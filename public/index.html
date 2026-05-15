@@ -202,6 +202,28 @@
         </div>
     </div>
 
+    <div id="quiz-category-modal" style="display: none; position: fixed; z-index: 4000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; flex-direction: column;">
+        <div style="background: #2c3e50; padding: 40px; border: 4px solid #f1c40f; border-radius: 15px; text-align: center; color: white;">
+            <h2 style="font-size: 2rem; margin-top:0;">🎓 Ώρα για Εξέταση!</h2>
+            <p style="font-size: 1.1rem;">Επίλεξε το μάθημα στο οποίο θέλεις να εξεταστείς για να ξεκλειδώσεις την υπόθεση:</p>
+            <div style="display: flex; gap: 20px; justify-content: center; margin-top: 30px;">
+                <button onclick="selectCategory('networks')" class="btn-active" style="background: #3498db; font-size: 1.2rem; padding: 15px 30px;">🌐 Δίκτυα Υπολογιστών</button>
+                <button onclick="selectCategory('programming')" class="btn-active" style="background: #e67e22; font-size: 1.2rem; padding: 15px 30px;">💻 Προγραμματισμός</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="quiz-question-modal" style="display: none; position: fixed; z-index: 4000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; flex-direction: column;">
+        <div style="background: #2c3e50; padding: 40px; border: 4px solid #e74c3c; border-radius: 15px; text-align: center; color: white; max-width: 600px;">
+            <h3 style="color: #f1c40f; font-size: 1.8rem; margin-top:0;">❓ Ερώτηση</h3>
+            <p id="quiz-question-text" style="font-size: 1.4rem; line-height: 1.5; margin-bottom: 30px;"></p>
+            <div style="display: flex; gap: 20px; justify-content: center;">
+                <button onclick="answerQuiz('Σωστό')" class="btn-active" style="background: #27ae60; padding: 15px 40px; font-size: 1.3rem;">Σωστό</button>
+                <button onclick="answerQuiz('Λάθος')" class="btn-active" style="background: #c0392b; padding: 15px 40px; font-size: 1.3rem;">Λάθος</button>
+            </div>
+        </div>
+    </div>
+
     <div id="disproof-choice-modal">
         <div style="text-align:center; color:white; background:#2c3e50; padding:20px; border-radius:10px; border:2px solid #f1c40f;">
             <h4>💡 Πρέπει να καταρρίψεις την υπόθεση!</h4>
@@ -252,6 +274,8 @@
         let isGameOver = false;
         let isFirstTurn = true;
         let activePlayerIdGlobal = null; 
+        
+        let previousActivePlayerId = null; 
 
         // --- ΣΥΣΤΗΜΑ ΟΥΡΑΣ ΕΙΔΟΠΟΙΗΣΕΩΝ ---
         let notificationQueue = [];
@@ -270,7 +294,6 @@
             const centerBox = document.getElementById('center-announcement');
             const content = document.getElementById('center-content');
             
-            // Αν το περιεχόμενο είναι κενό, σημαίνει ότι θέλουμε μόνο καθυστέρηση (για το συννεφάκι)
             if (currentNotification.content) {
                 content.innerHTML = currentNotification.content;
                 centerBox.style.display = 'block';
@@ -329,11 +352,11 @@
             const activePlayerId = data.id || data; 
             const activePlayerName = data.name || "Κάποιος";
             activePlayerIdGlobal = activePlayerId; 
+            
             roomOverlay.style.display = 'none';
             hypBox.style.display = 'none';
             document.getElementById('active-player-figure').style.display = 'none';
             document.getElementById('speech-bubble').style.display = 'none';
-            lastKnownRoom = null;
 
             isMyTurn = (activePlayerId === myId);
             const accusationBtn = document.getElementById('open-accusation-btn');
@@ -422,6 +445,11 @@
             const accusationBtn = document.getElementById('open-accusation-btn');
             
             if (activePlayer) {
+                if (activePlayerIdGlobal !== previousActivePlayerId) {
+                    lastKnownRoom = activePlayer.currentRoom;
+                    previousActivePlayerId = activePlayerIdGlobal;
+                }
+
                 if (activePlayer.currentRoom && activePlayer.currentRoom !== lastKnownRoom) {
                     document.getElementById('current-room-text').innerText = roomNamesGR[activePlayer.currentRoom] || activePlayer.currentRoom;
                     roomOverlay.style.backgroundImage = `url('images/backgrounds/${activePlayer.currentRoom}.webp')`;
@@ -430,7 +458,8 @@
                     const figFile = charFigures[activePlayer.character];
                     if (figFile && figImg) { figImg.src = `images png/figoures png/${figFile}`; figImg.style.display = 'block'; }
                     if (accusationBtn) accusationBtn.style.display = 'none';
-                    if (isMyTurn) { hypBox.style.display = 'block'; fillHypOptions(); } else { hypBox.style.display = 'none'; }
+                    
+                    if (isMyTurn) { fillHypOptions(); } else { hypBox.style.display = 'none'; }
                 }
                 if (!activePlayer.currentRoom) { 
                     roomOverlay.style.display = 'none'; hypBox.style.display = 'none'; 
@@ -471,11 +500,19 @@
         }
 
         function autoExitRoom() {
+            if (visualTimerInterval) clearInterval(visualTimerInterval);
+            document.getElementById('hyp-timer-display').style.color = '#e74c3c';
+
             roomOverlay.style.display = 'none'; hypBox.style.display = 'none';
             socket.emit('finish-turn-from-room'); 
         }
 
+        document.getElementById('exit-room-view-btn').onclick = autoExitRoom;
+
         document.getElementById('submit-hyp-btn').onclick = () => {
+            if (visualTimerInterval) clearInterval(visualTimerInterval); 
+            document.getElementById('hyp-timer-display').style.color = '#e74c3c'; 
+            
             socket.emit('make-hypothesis', { 
                 suspect: document.getElementById('hyp-suspect').value, 
                 weapon: document.getElementById('hyp-weapon').value 
@@ -483,26 +520,21 @@
             hypBox.style.display = 'none';
         };
 
-        // --- ΝΕΑ ΛΟΓΙΚΗ: ΤΟ ΣΥΝΝΕΦΑΚΙ ΜΠΑΙΝΕΙ ΣΤΗΝ ΟΥΡΑ ---
         socket.on('global-announcement', (data) => {
             const bubble = document.getElementById('speech-bubble');
             const s_name = suspectNamesGR[data.suspect] || data.suspect;
             const w_name = weaponNamesGR[data.weapon] || data.weapon;
             const r_name = roomNamesGR[data.room] || data.room;
 
-            // 1. Εμφανίζουμε το συννεφάκι αμέσως (γιατί είναι μέρος του Room View)
             bubble.innerHTML = `Ήταν ο/η <span style="color:#e74c3c">${s_name}</span> με το/τη <span style="color:#e74c3c">${w_name}</span> στο/στη <span style="color:#2980b9">${r_name}</span>;`;
             bubble.style.display = 'block';
 
-            // 2. Προσθέτουμε μια «τεχνητή» καθυστέρηση στην ουρά
-            // Στέλνουμε κενό content για να μην βγει το κεντρικό modal, αλλά να σταματήσει η ροή για 4 δευτερόλεπτα
             queueCenterModal("", 4000);
         });
 
         socket.on('request-disproof-choice', (data) => {
             const modal = document.getElementById('disproof-choice-modal');
             const container = document.getElementById('disproof-cards-container');
-            // Αυτό το modal είναι διαδραστικό, οπότε το βάζουμε στην ουρά με callback εμφάνισης
             queueCenterModal("", 100, () => {
                 container.innerHTML = '';
                 modal.style.display = 'flex';
@@ -574,7 +606,6 @@
         document.getElementById('close-accusation').onclick = () => accusationModal.style.display = 'none';
 
         socket.on('player-eliminated', (data) => {
-            // 1. Αυτόματη συμπλήρωση σημειωματάριου όλων των παικτών
             data.playerCards.forEach(card => {
                 const checkbox = document.querySelector(`.notebook-container input[value="${card}"]`);
                 if (checkbox) {
@@ -584,90 +615,30 @@
                 }
             });
 
-            const isMe = (data.playerId === myId); // Έλεγχος αν ο τοπικός παίκτης είναι ο ηττημένος
+            const isMe = (data.playerId === myId); 
             let myHtml = "";
 
             if (isMe) {
-                // --- ΕΜΦΑΝΙΣΗ ΓΙΑ ΤΟΝ ΗΤΤΗΜΕΝΟ ---
-                // Μόνο το μήνυμα, χωρίς αναφορά στις κάρτες ή εμφάνιση αυτών
                 myHtml = `<h2 style="color:#e74c3c; margin:0;">❌ Λάθος κατηγορία! Αποκλειστήκατε.</h2>`;
-                
-                // Απενεργοποίηση ελέγχων
                 rollBtn.disabled = true;
                 const accusationBtn = document.getElementById('open-accusation-btn');
                 if (accusationBtn) accusationBtn.style.display = 'none';
                 isMyTurn = false;
             } else {
-                // --- ΕΜΦΑΝΙΣΗ ΓΙΑ ΤΟΥΣ ΥΠΟΛΟΙΠΟΥΣ ---
-                // Δημιουργία HTML για τις κάρτες
                 let cardsHtml = '<div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:15px;">';
                 data.playerCards.forEach(cardName => {
                     cardsHtml += `<img src="images/cards/${cardName}.webp" style="width:90px; border:2px solid #e74c3c; border-radius:5px; box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);">`;
                 });
                 cardsHtml += '</div>';
 
-                // Μήνυμα που περιλαμβάνει το όνομα του ηττημένου μετά το "του/της"
                 myHtml = `
                     <h2 style="color:#e74c3c; margin:0;">💀 Ο/Η ${data.playerName} αποκλείστηκε!</h2>
                     <p style="font-size:0.95rem; color:#bbb; margin-top: 10px;">Οι κάρτες του/της <strong>${data.playerName}</strong> αποκαλύφθηκαν και σημειώθηκαν στο μπλοκάκι σας:</p>
                     ${cardsHtml}
                 `;
             }
-            
-            // Εμφάνιση μέσω της ουράς ειδοποιήσεων
             queueCenterModal(myHtml, 6000);
         });
-
-        /* socket.on('player-eliminated', (data) => {
-            // 1. Αυτόματη συμπλήρωση σημειωματάριου όλων των παικτών
-            data.playerCards.forEach(card => {
-                const checkbox = document.querySelector(`.notebook-container input[value="${card}"]`);
-                if (checkbox) {
-                    checkbox.checked = true;
-                    checkbox.parentElement.style.color = "#e74c3c";
-                    checkbox.parentElement.style.textDecoration = "line-through";
-                }
-            });
-            
-            // 2. Δημιουργία HTML για τις κάρτες του παίκτη που έχασε (με κόκκινο περίγραμμα και σκιά)
-            let cardsHtml = '<div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:15px;">';
-            data.playerCards.forEach(cardName => {
-                cardsHtml += `<img src="images/cards/${cardName}.webp" style="width:90px; border:2px solid #e74c3c; border-radius:5px; box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);">`;
-            });
-            cardsHtml += '</div>';
-
-            // 3. Διαχωρισμός μηνύματος: Αν έχασα εγώ ή κάποιος άλλος
-            let message = (data.playerId === myId) ? 
-                `<h2 style="color:#e74c3c; margin:0;">❌ Λάθος κατηγορία! Αποκλειστήκατε.</h2>` : 
-                `<h2 style="color:#e74c3c; margin:0;">💀 Ο/Η ${data.playerName} αποκλείστηκε!</h2>`;
-
-            const myHtml = `
-                ${message}
-                <p style="font-size:0.95rem; color:#bbb; margin-top: 10px;">Οι κάρτες του/της αποκαλύφθηκαν και σημειώθηκαν στο μπλοκάκι σας:</p>
-                ${cardsHtml}
-            `;
-            
-            // 4. Προσθήκη στην ουρά ειδοποιήσεων για 8 δευτερόλεπτα
-            queueCenterModal(myHtml, 8000);
-            
-            // 5. Αν έχασα εγώ, νεκρώνω το UI μου
-            if (data.playerId === myId) {
-                rollBtn.disabled = true;
-                const accusationBtn = document.getElementById('open-accusation-btn');
-                if (accusationBtn) accusationBtn.style.display = 'none';
-                isMyTurn = false;
-            }
-        }); */
-
-        /*socket.on('player-eliminated', (data) => {
-            data.playerCards.forEach(card => {
-                const cb = document.querySelector(`.notebook-container input[value="${card}"]`);
-                if (cb) { cb.checked = true; cb.parentElement.style.color = "#e74c3c"; }
-            });
-            let message = (data.playerId === myId) ? "❌ Αποκλειστήκατε!" : `Ο/Η ${data.playerName} αποκλείστηκε!`;
-            queueCenterModal(`<h2 style="color:#e74c3c;">${message}</h2>`, 8000);
-            if (data.playerId === myId) { rollBtn.disabled = true; document.getElementById('open-accusation-btn').style.display = 'none'; }
-        }); */
 
         socket.on('game-over-victory', (data) => {
             isGameOver = true;
@@ -678,44 +649,37 @@
         });
 
         socket.on('abandoned-cards-revealed', (data) => {
-            // 1. Αυτόματη συμπλήρωση σημειωματάριου με ΜΠΛΕ χρώμα
             data.cards.forEach(cardName => {
                 const checkbox = document.querySelector(`.notebook-container input[value="${cardName}"]`);
                 if (checkbox) {
                     checkbox.checked = true;
                     const labelElement = checkbox.parentElement; 
                     labelElement.style.textDecoration = "line-through";
-                    labelElement.style.color = "royalblue"; // Μπλε χρώμα για κάρτες αποσυνδεδεμένου
+                    labelElement.style.color = "royalblue"; 
                     labelElement.style.fontWeight = "bold";
                     labelElement.title = `Κάρτα από τον παίκτη ${data.playerName} που αποσυνδέθηκε`;
                 }
             });
 
-            // 2. Δημιουργία HTML για τις κάρτες με μπλε περίγραμμα
             let cardsHtml = '<div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:15px;">';
             data.cards.forEach(cardName => {
                 cardsHtml += `<img src="images/cards/${cardName}.webp" style="width:90px; border:2px solid royalblue; border-radius:5px; box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);">`;
             });
             cardsHtml += '</div>';
 
-            // 3. Σύνθεση του μηνύματος για το "πάτωμα"
             const myHtml = `
             <h2 style="color: royalblue; margin:0;">🔌 Αποχώρηση Παίκτη!</h2>
             <p style="font-size: 1.1rem; margin: 10px 0;">Ο/Η <strong>${data.playerName}</strong> αποσυνδέθηκε.</p>
             <p style="font-size: 0.95rem; color: #bbb;">Οι κάρτες του/της βρέθηκαν πεταμένες στο πάτωμα και σημειώθηκαν στο μπλοκάκι σου:</p>
             ${cardsHtml}
             `;
-            
-            // Εμφάνιση στην ουρά ειδοποιήσεων
             queueCenterModal(myHtml, 6000);
         });
 
-        // --- ΑΝΑΒΑΘΜΙΣΜΕΝΟ: LISTENER ΓΙΑ ΤΟ ΚΑΚΟ ΤΕΛΟΣ (BAD ENDING) ---
         socket.on('game-over-bad-ending', (data) => {
             isGameOver = true; 
             if (startBtn) startBtn.style.display = 'none'; 
 
-            // 1. ΝΕΚΡΩΜΑ & ΓΚΡΙΖΑΡΙΣΜΑ ΤΟΥ UI ΓΙΑ ΟΛΟΥΣ
             const elementsToFreeze = [
                 document.getElementById('board-container'),
                 document.getElementById('controls-ui'),
@@ -725,21 +689,19 @@
             
             elementsToFreeze.forEach(el => {
                 if (el) {
-                    el.style.filter = 'grayscale(1) brightness(0.6)'; // Πιο σκοτεινό και ασπρόμαυρο
-                    el.style.pointerEvents = 'none';                // Κλείδωμα κλικ
-                    el.style.opacity = '0.6';                       // Ημιδιαφάνεια
-                    el.style.transition = 'all 2s ease-in-out';     // Πολύ αργή και δραματική μετάβαση
+                    el.style.filter = 'grayscale(1) brightness(0.6)';
+                    el.style.pointerEvents = 'none';
+                    el.style.opacity = '0.6';
+                    el.style.transition = 'all 2s ease-in-out';
                 }
             });
 
-            // 2. Δημιουργία των καρτών του φακέλου
             let cardsHtml = '<div style="display:flex; justify-content:center; gap:15px; margin-top:20px;">';
             data.envelope.forEach(cardName => {
                 cardsHtml += `<img src="images/cards/${cardName}.webp" style="width:120px; border:3px solid #e74c3c; border-radius:8px; box-shadow: 0 0 20px rgba(231,76,60,0.8);">`;
             });
             cardsHtml += '</div>';
 
-            // 3. Σύνθεση του τελικού μηνύματος
             const myHtml = `
             <h1 style="color:#e74c3c; font-size:3rem; margin-bottom:10px; text-shadow: 0 0 15px #000;">💀 GAME OVER</h1>
             <p style="font-size:1.3rem; font-weight:bold;">Όλοι οι ντετέκτιβ απέτυχαν. Ο Δολοφόνος διέφυγε!</p>
@@ -749,18 +711,14 @@
             </div>
             <p style="font-size:0.9rem; color:#888;">Η υπόθεση έκλεισε ανεξιχνίαστη.</p>
             `;
-            
-            // Εμφάνιση στην ουρά ειδοποιήσεων
             queueCenterModal(myHtml, 9999999);
         });
 
         socket.on('game-stopped-signal', () => {
-            // 1. Εφαρμογή των κλασικών κλάσεων απενεργοποίησης
             document.getElementById('board-container').classList.add('pre-game-disabled');
             document.getElementById('controls-ui').classList.add('pre-game-disabled');
             document.querySelector('.notebook-container').classList.add('pre-game-disabled');
 
-            // 2. ΝΕΚΡΩΜΑ & ΓΚΡΙΖΑΡΙΣΜΑ του UI
             const elementsToFreeze = [
                 document.getElementById('board-container'),
                 document.getElementById('controls-ui'),
@@ -777,11 +735,69 @@
                 }
             });
 
-            // Εμφάνιση του κουμπιού έναρξης αν χρειάζεται
             if (document.getElementById('start-btn').style.display !== 'none') {
                 document.getElementById('setup-area').style.display = 'block';
             }
         });
+
+        // --- ΕΚΠΑΙΔΕΥΤΙΚΗ ΛΟΓΙΚΗ (QUIZ) ---
+        
+        socket.on('request-quiz-category', () => {
+            document.getElementById('quiz-category-modal').style.display = 'flex';
+        });
+
+        function selectCategory(cat) {
+            document.getElementById('quiz-category-modal').style.display = 'none';
+            socket.emit('select-quiz-category', cat);
+        }
+
+        socket.on('receive-quiz-question', (data) => {
+            document.getElementById('quiz-question-text').innerText = data.question;
+            document.getElementById('quiz-question-modal').style.display = 'flex';
+        });
+
+        function answerQuiz(ans) {
+            document.getElementById('quiz-question-modal').style.display = 'none';
+            socket.emit('submit-quiz-answer', ans);
+        }
+
+        socket.on('quiz-result', (data) => {
+            let html = '';
+            if (data.success) {
+                html = `<h2 style="color:#27ae60;">✅ Σωστή Απάντηση!</h2><p style="font-size:1.1rem;">${data.explanation}</p>`;
+            } else {
+                html = `<h2 style="color:#e74c3c;">❌ Λάθος!</h2><p style="font-size:1.1rem;">${data.explanation}</p><p style="color:#888;">Χάνεις την ευκαιρία για υπόθεση.</p>`;
+            }
+            queueCenterModal(html, 6000);
+        });
+
+        socket.on('unlock-hypothesis-ui', () => {
+            hypBox.style.display = 'block'; 
+        });
+
+        // --- ΛΟΓΙΚΗ ΧΡΟΝΟΜΕΤΡΟΥ ---
+        socket.on('start-hyp-timer', (data) => {
+            if (data.id === myId) {
+                let secondsLeft = data.seconds;
+                const timerDisplay = document.getElementById('hyp-timer-display');
+                timerDisplay.innerText = secondsLeft + 's';
+                
+                if (visualTimerInterval) clearInterval(visualTimerInterval);
+                
+                visualTimerInterval = setInterval(() => {
+                    secondsLeft--;
+                    if (secondsLeft >= 0) {
+                        timerDisplay.innerText = secondsLeft + 's';
+                        if (secondsLeft <= 10) {
+                            timerDisplay.style.color = (secondsLeft % 2 === 0) ? '#e74c3c' : '#ffffff';
+                        }
+                    } else {
+                        clearInterval(visualTimerInterval);
+                    }
+                }, 1000);
+            }
+        });
+
     </script>
 </body>
 </html>
