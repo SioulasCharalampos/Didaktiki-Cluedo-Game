@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <title>ΠΑΜΑΚ Cluedo - Επιλογή Χαρακτήρα</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            background-image: url('images/Πρόσοψη.webp');
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+            background-attachment: fixed;
+            margin: 0;
+            padding: 20px;
+            display: block; /* Override flex από το style.css */
+        }
+
+        #login-screen {
+            background-color: rgba(0, 0, 0, 0.9);
+            border: 3px solid #27ae60;
+            padding: 40px;
+            border-radius: 15px;
+            max-width: 600px;
+            margin: 100px auto;
+            text-align: center;
+        }
+
+        #character-selection-screen {
+            background-color: #1a1a1a;
+            width: 1250px;
+            margin: 30px auto;
+            padding: 40px;
+            border: 4px solid #27ae60;
+            border-radius: 15px;
+            display: none;
+        }
+
+        .character-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .character-card {
+            background-color: #000;
+            border: 2px solid #f1c40f;
+            border-radius: 12px;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            align-items: flex-start;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .character-card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 15px #f1c40f;
+        }
+
+        .character-card.selected {
+            border: 4px solid #27ae60;
+            box-shadow: 0 0 20px #27ae60;
+        }
+
+        .character-card.taken {
+            opacity: 0.4;
+            filter: grayscale(100%);
+            pointer-events: none;
+        }
+
+        .card-image {
+            width: 150px;
+            height: auto;
+            border-radius: 8px;
+            border: 2px solid #333;
+        }
+
+        .card-description h3 {
+            color: #f1c40f;
+            margin: 0 0 10px 0;
+        }
+
+        .card-description p {
+            color: white;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <h1>🕵️ Επιχείρηση ΠΑΜΑΚ</h1>
+        <p>Μόλις ανέλαβες την πιο μυστήρια υπόθεση του Πανεπιστημίου.</p>
+        <p>Όνομα Πράκτορα:</p>
+        <input type="text" id="player-name" placeholder="π.χ. James Bond" style="padding: 12px; width: 80%; margin-bottom: 20px; border-radius: 5px; border: none;">
+        <br>
+        <button id="submit-name" class="btn-active">Επόμενο</button>
+    </div>
+
+    <div id="intro-screen" style="display: none; background-color: rgba(0, 0, 0, 0.9); border: 3px solid #f1c40f; padding: 40px; border-radius: 15px; max-width: 800px; margin: 50px auto; text-align: center; color: white;">
+        <h1>Locked in PAMAK: The Final Grade</h1>
+        <p style="font-size: 1.1em; line-height: 1.6;">Παρασκευή βράδυ στο ΠΑΜΑΚ. Η μεγάλη εξέταση της
+            «Αρχιτεκτονικής Συστημάτων» μόλις τελείωσε. Ο κ.
+            Παγοκόφτης, ο καθηγητής που φημιζόταν για την
+            αυστηρότητά του και τον μηδενισμό των γραπτών,
+            βρίσκεται νεκρός. Πριν προλάβουν οι ύποπτοι να
+            διαφύγουν, η κυρία φύλακας, ακολουθώντας το
+            πρωτόκολλο ασφαλείας, κλειδώνει τις ηλεκτρονικές
+            πύλες του κτιρίου. Κανείς δεν πρόκειται να φύγει από το
+            πανεπιστήμιο αν δεν εξιχνιαστεί το έγκλημα.</p>
+        <h2 style="color: #f1c40f;">The Mission:</h2>
+        <p>Οι 6 παγιδευμένοι παίκτες πρέπει να ανακαλύψουν
+            μέσω στοιχείων και υποθέσεων τη λύση του μυστηρίου
+            που κρύβεται στον «Φάκελο της Φύλακα».</p>
+        <br>
+        <button id="start-game" class="btn-active" style="padding: 15px 40px;">Κατανόησα την Αποστολή</button>
+    </div>
+
+    <div id="character-selection-screen">
+        <h1 style="color: white; text-align: center;">Επίλεξε τον χαρακτήρα σου</h1>
+        
+        <div class="character-grid">
+            <div class="character-card" onclick="selectChar('Makis', this)">
+                <img src="images/character_tables/Μάκης.webp" class="card-image">
+                <div class="card-description">
+                    <h3>Μάκης ο "Αιώνιος"</h3>
+                    <p>Ο θρύλος του τμήματος (14+ έτη). Έχει τη δική του καρέκλα στο αμφιθέατρο και ξέρει τους τοίχους με το μικρό τους όνομα.<br>Κίνητρο: Ο Δρ. Κατσούφης του
+                        ανακοίνωσε ότι θα τον διαγράψει
+                        οριστικά λόγω των συνεχόμενων
+                        μηδενισμών, βάζοντας τέλος στη
+                        "φοιτητική" του ζωή.</p>
+                </div>
+            </div>
+
+            <div class="character-card" onclick="selectChar('Litsa', this)">
+                <img src="images/character_tables/Λίτσα.webp" class="card-image">
+                <div class="card-description">
+                    <h3>Κυρία Λίτσα η "Κέρβερος"</h3>
+                    <p>Η "σιδηρά κυρία" της Γραμματείας. Ελέγχει τα πάντα από το γραφείο της με ένα μόνιμο ύφος "περάστε αύριο".<br>Κίνητρο: Ο Κατσούφης ανακάλυψε ότι
+                        η Λίτσα άλλαζε βαθμούς σε "δικά της"
+                        παιδιά στο σύστημα (Παραβίαση
+                        Απορρήτου - Άρθρο 3) και θα την
+                        κατήγγειλε.</p>
+                </div>
+            </div>
+
+            <div class="character-card" onclick="selectChar('Nefeli', this)">
+                <img src="images/character_tables/Νεφέλη.webp" class="card-image">
+                <div class="card-description">
+                    <h3>Νεφέλη η "Αριστούχος"</h3>
+                    <p>Η κορυφαία του έτους με μέσο όρο 9.9. Δεν έχει βγει από τη βιβλιοθήκη από το 2022.<br>Κίνητρο: Ο Κατσούφης της
+                        στέρησε το απόλυτο 10 (και την
+                        υποτροφία) για ένα λάθος
+                        στοίχισης στον κώδικα,
+                        προκαλώντας της την πρώτη
+                        "αποτυχία" της ζωής της.</p>
+                </div>
+            </div>
+
+            <div class="character-card" onclick="selectChar('Kserolas', this)">
+                <img src="images/character_tables/Ξερόλας.webp" class="card-image">
+                <div class="card-description">
+                    <h3>Καθηγητής Ξερόλας</h3>
+                    <p>Ο ανταγωνιστής καθηγητής. Διορθώνει τους πάντες και θεωρεί τον εαυτό του τη μόνη αυθεντία.<br>Κίνητρο: Ο Κατσούφης είχε βρει
+                        αποδείξεις λογοκλοπής στη διατριβή
+                        του Ξερόλα. Με τον Κατσούφη εκτός,
+                        Ξερόλας σώζει την καριέρα του και
+                        παίρνει την έδρα.</p>
+                </div>
+            </div>
+
+            <div class="character-card" onclick="selectChar('Rania', this)">
+                <img src="images/character_tables/Ράνια.webp" class="card-image">
+                <div class="card-description">
+                    <h3>Ράνια η "Αγωνίστρια"</h3>
+                    <p>Η αιώνια συνδικαλίστρια. Πάντα με μια ντουντούκα στο χέρι και έτοιμη για κατάληψη.<br>Κίνητρο: Ο Κατσούφης πρότεινε την
+                        επιβολή κάρτας εισόδου και την
+                        κατάργηση των παρατάξεων. Για τη
+                        Ράνια, ο Κατσούφης ήταν "ταξικός
+                        εχθρός" που έπρεπε να σταματήσει.</p>
+                </div>
+            </div>
+
+            <div class="character-card" onclick="selectChar('Nikos', this)">
+                <img src="images/character_tables/Νίκος.webp" class="card-image">
+                <div class="card-description">
+                    <h3>Νίκος ο "Party-Animal"</h3>
+                    <p>Ο PR-άς των events. Ξέρει κάθε club της Θεσσαλονίκης αλλά κανένα εργαστήριο.<br>Κίνητρο: Ο Κατσούφης τον έπιασε να
+                        πουλάει εισιτήρια για πάρτι μέσα
+                        στο μάθημα και εισηγήθηκε την
+                        πειθαρχική του δίωξη.</p>
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button onclick="confirmSelection()" class="btn-active" style="padding: 15px 60px;">Επιβεβαίωση Επιλογής</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        // --- ΠΡΟΣΘΗΚΗ: ΚΛΕΙΔΩΜΑ ΕΙΣΟΔΟΥ ---
+        socket.on('game-already-started', () => {
+            alert("⚠️ Το παιχνίδι είναι ήδη σε εξέλιξη! Δεν μπορείτε να επιλέξετε χαρακτήρα αυτή τη στιγμή.");
+            //window.location.href = "https://www.uom.gr"; // Ανακατεύθυνση στο site του ΠΑΜΑΚ
+            document.body.innerHTML = `
+            <div style="background: rgba(0,0,0,0.9); height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; font-family: sans-serif;">
+                <h1 style="color: #e74c3c;">🚫 ΕΙΣΟΔΟΣ ΑΠΑΓΟΡΕΥΕΤΑΙ</h1>
+                <p style="font-size: 1.2em;">Η υπόθεση εξελίσσεται ήδη από άλλους πράκτορες.</p>
+                <button onclick="window.location.reload()" style="padding: 15px 30px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px;">
+                    Έλεγχος για νέα διαθεσιμότητα
+                </button>
+            </div> 
+          `;
+        });
+        // ---------------------------------
+
+        let selectedCharacter = null;
+
+        // ΒΗΜΑ 1: Από το Login στην Εισαγωγή
+        document.getElementById('submit-name').onclick = function() {
+            const name = document.getElementById('player-name').value.trim();
+            if (name === "") {
+                alert("Χρειάζεσαι ένα όνομα για την αποστολή!");
+                return;
+            }
+            // Κρύβουμε το Login, εμφανίζουμε την Εισαγωγή
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('intro-screen').style.display = 'block';
+        };
+
+        // ΒΗΜΑ 2: Από την Εισαγωγή στην Επιλογή Χαρακτήρα
+        document.getElementById('start-game').onclick = function() {
+            // Κρύβουμε την Εισαγωγή, εμφανίζουμε τους Χαρακτήρες
+            document.getElementById('intro-screen').style.display = 'none';
+            document.getElementById('character-selection-screen').style.display = 'block';
+        };
+
+        // 2. Επιλογή κάρτας (το ίδιο όπως πριν)
+        function selectChar(charId, element) {
+            document.querySelectorAll('.character-card').forEach(card => card.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedCharacter = charId;
+        }
+
+        // 3. Επικοινωνία με Server (το ίδιο όπως πριν)
+        socket.on('update-occupied-characters', function(takenNames) {
+            const cards = document.querySelectorAll('.character-card');
+            cards.forEach(card => {
+                const onclickAttr = card.getAttribute('onclick');
+                const charId = onclickAttr.match(/'([^']+)'/)[1];
+                if (takenNames.includes(charId)) {
+                    card.classList.add('taken');
+                    const title = card.querySelector('h3');
+                    if (!title.innerText.includes("(ΠΙΑΣΜΕΝΟΣ)")) {
+                        title.innerHTML += " <span style='color:red; font-size:0.7em;'>(ΠΙΑΣΜΕΝΟΣ)</span>";
+                    }
+                }
+            });
+        });
+
+        // 4. Τελική Επιβεβαίωση
+        function confirmSelection() {
+            const name = document.getElementById('player-name').value.trim();
+            if (!selectedCharacter) {
+                alert("Διάλεξε έναν χαρακτήρα!");
+                return;
+            }
+
+            sessionStorage.setItem('pamak_username', name);
+            sessionStorage.setItem('pamak_character', selectedCharacter);
+
+            socket.emit('select-character', selectedCharacter);
+            
+            alert("Η επιλογή κλειδώθηκε! Καλή τύχη στο ΠΑΜΑΚ...");
+            window.location.href = 'index.html';
+        }
+
+        // ENTER key support για όλες τις οθόνες
+        document.addEventListener('keydown', (e) => {
+            if (e.key === "Enter") {
+                if (document.getElementById('login-screen').style.display !== 'none') {
+                    document.getElementById('submit-name').click();
+                } else if (document.getElementById('intro-screen').style.display !== 'none') {
+                    document.getElementById('start-game').click();
+                } else if (document.getElementById('character-selection-screen').style.display !== 'none') {
+                    confirmSelection();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

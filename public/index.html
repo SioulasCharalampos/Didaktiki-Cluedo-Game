@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <title>ΠΑΜΑΚ Cluedo - Game Board</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Τα inline styles παραμένουν ως είχαν */
+        #announcement-overlay {
+            position: fixed; top: 20px; right: 20px; width: 320px;        
+            background: linear-gradient(145deg, #1a1a1a, #2c3e50); color: #f1c40f;
+            padding: 20px; border: 3px solid #f1c40f; border-radius: 12px;
+            box-shadow: -5px 5px 25px rgba(0,0,0,0.8); z-index: 10000;
+            text-align: left; display: none; font-family: 'Segoe UI', sans-serif;
+            animation: slideInRight 0.5s ease-out; 
+        }
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(100px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .announcement-header {
+            border-bottom: 1px solid #f1c40f; padding-bottom: 8px; margin-bottom: 12px;
+            font-weight: bold; display: flex; align-items: center; gap: 10px;
+        }
+        #hypothesis-box {
+            background: rgba(0, 0, 0, 0.9); padding: 20px; border-radius: 10px;
+            border: 2px solid #f1c40f; width: 350px; position: absolute;
+            top: 45%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; color: white; z-index: 600; display: none;
+        }
+        .hyp-select { padding: 10px; margin: 10px 0; width: 100%; border-radius: 5px; background: #222; color: white; border: 1px solid #f1c40f; }
+        #hyp-timer-display { font-size: 1.5rem; color: #e74c3c; font-weight: bold; margin-bottom: 10px; }
+        #evidence-modal, #disproof-choice-modal {
+            display: none; position: fixed; z-index: 3000; left: 0; top: 0;
+            width: 100%; height: 100%; background: rgba(0,0,0,0.9);
+            justify-content: center; align-items: center; flex-direction: column;
+        }
+        .disproof-card-choice {
+            width: 140px; cursor: pointer; border: 3px solid transparent; border-radius: 10px; transition: 0.3s; margin: 5px;
+        }
+        .disproof-card-choice.disabled { opacity: 0.2; cursor: not-allowed; filter: grayscale(1); }
+        .disproof-card-choice:hover:not(.disabled) { border-color: #f1c40f; transform: scale(1.05); }
+        .loader {
+            border: 4px solid #333;
+            border-top: 4px solid #f1c40f;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 15px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #open-accusation-btn {
+            position: absolute; top: 340px; left: 55%;
+            transform: translate(-50%, -50%) scale(0.65); z-index: 10;
+        }
+        
+        #open-accusation-btn.disabled { opacity: 0.5; pointer-events: none; filter: grayscale(0.7); }
+
+        #active-player-figure {
+            display: none; position: absolute; left: 5%; bottom: 0;
+            height: 80vh; z-index: 550; pointer-events: none;
+            filter: drop-shadow(0 0 20px rgba(0,0,0,0.8));
+            animation: slideInLeft 0.6s ease-out;
+        }
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-100px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Στυλ για το Συννεφάκι Υπόθεσης */
+        #speech-bubble {
+            display: none; position: absolute; bottom: 55vh; left: 28%;
+            background: #fdf6e3; color: #2c3e50; padding: 20px 25px;
+            border-radius: 30px; border: 4px solid #2c3e50;
+            font-size: 1.3rem; font-weight: bold; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            z-index: 600; max-width: 350px; text-align: center;
+            animation: popBubble 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        #speech-bubble::after {
+            content: ''; position: absolute; bottom: -20px; left: 30px;
+            border-width: 20px 20px 0 0; border-style: solid; border-color: #2c3e50 transparent transparent transparent;
+        }
+        #speech-bubble::before {
+            content: ''; position: absolute; bottom: -14px; left: 33px;
+            border-width: 16px 16px 0 0; border-style: solid; border-color: #fdf6e3 transparent transparent transparent; z-index: 1;
+        }
+        @keyframes popBubble {
+            from { opacity: 0; transform: scale(0.5) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="announcement-overlay">
+        <div id="announcement-content" class="announcement-text"></div>
+    </div>
+
+    <div id="center-announcement">
+        <div id="center-content"></div>
+        <button onclick="this.parentElement.style.display='none'" class="btn-active" style="margin-top:20px;">Κλείσιμο</button>
+    </div>
+    
+    <div id="game-header">
+        <h1>🕵️ ΠΑΜΑΚ Cluedo: Murder at Egnatia</h1>
+        <div id="players-list-container">
+            <div id="players-counter">Αναμονή παικτών...</div>
+            <div id="connected-players-labels"></div>
+        </div>
+        <div class="log-container"><div id="game-log"></div></div>
+        <div id="turn-indicator">Σύνδεση στο δίκτυο...</div>
+    </div>
+    
+    <div id="setup-area">
+        <button id="start-btn" style="display: none;">🚀 Έναρξη Παιχνιδιού</button>
+    </div>
+    
+    <div id="main-game-layout">
+        <div id="game-top-row">
+            <div id="left-column">
+                <div id="board-scale-wrapper">
+                    <div id="board-container" class="pre-game-disabled">
+                        <div id="room-view-overlay">
+                            <img id="active-player-figure" src="" alt="Active Player">
+                            <div id="speech-bubble"></div>
+                            <div id="hypothesis-box">
+                                <h3>🔍 Διατύπωση Υπόθεσης</h3>
+                                <div id="hyp-timer-display">60s</div>
+                                <p>Βρίσκεσαι στο: <strong id="current-room-text" style="color:#f1c40f;">...</strong></p>
+                                <label>Ύποπτος:</label>
+                                <select id="hyp-suspect" class="hyp-select"></select>
+                                <label>Όπλο:</label>
+                                <select id="hyp-weapon" class="hyp-select"></select>
+                                <button id="submit-hyp-btn" class="btn-active" style="width:100%">Υποβολή</button>
+                            </div>
+                            <button id="exit-room-view-btn">🔙 Έξοδος & Τέλος Σειράς</button>
+                        </div>
+                        <div class="industrial-button-container disabled" id="open-accusation-btn">
+                            <div class="metal-bezel"> <div class="big-red-button"> <span class="button-text">ΤΕΛΙΚΗ<br>ΚΑΤΗΓΟΡΙΑ</span></div></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="controls-ui" class="pre-game-disabled">
+                    <div id="dice-section" style="display:flex; align-items:center; gap:20px;">
+                        <button id="roll-btn" disabled>🎲 Ρίξε τα Ζάρια</button>
+                        <div id="moves-left">Κινήσεις: 0</div>
+                    </div>
+                </div>
+            </div>
+            <div id="right-column">
+                <div class="notebook-container pre-game-disabled">
+                    <h3>📝 Σημειωματάριο Ντετέκτιβ</h3>
+                    <div class="notebook-grid">
+                        <div class="notebook-section">
+                            <h4>👤 ΥΠΟΠΤΟΙ</h4>
+                            <div class="rooms-columns">
+                                <label><input type="checkbox" value="Makis"> Μάκης</label>
+                                <label><input type="checkbox" value="Nefeli"> Νεφέλη</label>
+                                <label><input type="checkbox" value="Litsa"> Λίτσα</label>
+                                <label><input type="checkbox" value="Kserolas"> Ξερόλας</label>
+                                <label><input type="checkbox" value="Nikos"> Νίκος</label>
+                                <label><input type="checkbox" value="Rania"> Ράνια</label>
+                            </div>
+                        </div>
+                        <div class="notebook-section">
+                            <h4>🏢 ΔΩΜΑΤΙΑ</h4>
+                            <div class="rooms-columns">
+                                <label><input type="checkbox" value="Gr_Katsoufi"> Γρ. Κατσούφη</label>
+                                <label><input type="checkbox" value="Toualetes"> Τουαλέτες</label>
+                                <label><input type="checkbox" value="Aith_Teleton"> Αίθ. Τελετών</label>
+                                <label><input type="checkbox" value="Amfitheatro_12"> Αμφιθέατρο 12</label>
+                                <label><input type="checkbox" value="Vivliothiki"> Βιβλιοθήκη</label>
+                                <label><input type="checkbox" value="Lesxi"> Λέσχη</label>
+                                <label><input type="checkbox" value="Grammateia"> Γραμματεία</label>
+                                <label><input type="checkbox" value="KYD"> Εργαστήριο ΚΥΔ</label>
+                                <label><input type="checkbox" value="Gipedo_Basket"> Γήπεδο Μπάσκετ</label>
+                            </div>
+                        </div>
+                        <div class="notebook-section">
+                            <h4>🔪 ΟΠΛΑ</h4>
+                            <div class="rooms-columns">
+                                <label><input type="checkbox" value="Pyrosvestiras"> Πυροσβεστήρας</label>
+                                <label><input type="checkbox" value="Metalliko_Thermos"> Μετ. Θερμός</label>
+                                <label><input type="checkbox" value="Palio_Laptop"> Παλιό Λάπτοπ</label>
+                                <label><input type="checkbox" value="Marm_Sfragida"> Μαρμ. Σφραγίδα</label>
+                                <label><input type="checkbox" value="Foit_Taftotita"> Φοιτ. Ταυτότητα</label>
+                                <label><input type="checkbox" value="Vary_Syggramma"> Σύγγραμμα</label>
+                            </div>
+                        </div>
+                    </div>
+                    <textarea id="personal-notes" placeholder="Σημειώσεις..."></textarea>
+                </div>
+            </div>
+        </div>
+        <div id="my-hand-container" style="display: none;">
+            <h4>🃏 Οι Κάρτες μου:</h4>
+            <div id="cards-display"></div>
+        </div>
+    </div>
+
+    <div id="disproof-choice-modal">
+        <div style="text-align:center; color:white; background:#2c3e50; padding:20px; border-radius:10px; border:2px solid #f1c40f;">
+            <h4>💡 Πρέπει να καταρρίψεις την υπόθεση!</h4>
+            <p>Διάλεξε μια κάρτα:</p>
+            <div id="disproof-cards-container" style="display:flex; justify-content:center; flex-wrap:wrap;"></div>
+        </div>
+    </div>
+
+    <div id="evidence-modal">
+        <h2 id="evidence-title" style="color:white;"></h2>
+        <div id="evidence-card-display"></div>
+        <button onclick="document.getElementById('evidence-modal').style.display='none'" class="btn-active" style="margin-top:20px;">Κλείσιμο</button>
+    </div>
+
+    <div id="accusation-modal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8);">
+        <div style="background-color: #2c3e50; margin: 10% auto; padding: 20px; border: 2px solid #f1c40f; width: 80%; max-width: 600px; border-radius: 10px; color: white;">
+            <h2 style="text-align: center; color: #f1c40f;">⚖️ Τελική Κατηγορία</h2>
+            <div style="display: flex; justify-content: space-around; gap: 10px; margin-top: 20px;">
+                <div><label>👤 Ύποπτος:</label><br><select id="accuse-suspect" style="padding: 5px;"></select></div>
+                <div><label>🏢 Δωμάτιο:</label><br><select id="accuse-room" style="padding: 5px;"></select></div>
+                <div><label>🔪 Όπλο:</label><br><select id="accuse-weapon" style="padding: 5px;"></select></div>
+            </div>
+            <div style="text-align: center; margin-top: 30px; display: flex; gap: 10px; justify-content: center;">
+                <button id="submit-accusation" class="btn-active">Υποβολή</button>
+                <button id="close-accusation" style="padding:10px; background:#7f8c8d; color:white; border:none; border-radius:5px; cursor:pointer;">Άκυρο</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const board = document.getElementById('board-container');
+        const log = document.getElementById('game-log');
+        const startBtn = document.getElementById('start-btn');
+        const rollBtn = document.getElementById('roll-btn');
+        const movesDisplay = document.getElementById('moves-left');
+        const turnIndicator = document.getElementById('turn-indicator');
+        const labelsContainer = document.getElementById('connected-players-labels');
+        const roomOverlay = document.getElementById('room-view-overlay');
+        const hypBox = document.getElementById('hypothesis-box');
+        
+        let myId = null;
+        let isMyTurn = false;
+        let myCards = [];
+        let visualTimerInterval = null;
+        let lastKnownRoom = null;
+        let isGameOver = false;
+        let isFirstTurn = true;
+        let activePlayerIdGlobal = null; 
+
+        // --- ΣΥΣΤΗΜΑ ΟΥΡΑΣ ΕΙΔΟΠΟΙΗΣΕΩΝ ---
+        let notificationQueue = [];
+        let isNotificationShowing = false;
+
+        function queueCenterModal(htmlContent, durationMs = 4000, callback = null) {
+            notificationQueue.push({ content: htmlContent, duration: durationMs, callback: callback });
+            processNotificationQueue();
+        }
+
+        function processNotificationQueue() {
+            if (isNotificationShowing || notificationQueue.length === 0) return;
+            isNotificationShowing = true;
+            
+            const currentNotification = notificationQueue.shift();
+            const centerBox = document.getElementById('center-announcement');
+            const content = document.getElementById('center-content');
+            
+            // Αν το περιεχόμενο είναι κενό, σημαίνει ότι θέλουμε μόνο καθυστέρηση (για το συννεφάκι)
+            if (currentNotification.content) {
+                content.innerHTML = currentNotification.content;
+                centerBox.style.display = 'block';
+            } else {
+                centerBox.style.display = 'none';
+            }
+
+            setTimeout(() => {
+                centerBox.style.display = 'none';
+                isNotificationShowing = false;
+                if (currentNotification.callback) currentNotification.callback();
+                setTimeout(processNotificationQueue, 500);
+            }, currentNotification.duration);
+        }
+
+        const roomNamesGR = { "Gr_Katsoufi": "Γρ. Κατσούφη", "Toualetes": "Τουαλέτες", "Aith_Teleton": "Αίθ. Τελετών", "Amfitheatro_12": "Αμφιθέατρο 12", "Vivliothiki": "Βιβλιοθήκη", "Lesxi": "Λέσχη", "Grammateia": "Γραμματεία", "KYD": "Εργαστήριο ΚΥΔ", "Gipedo_Basket": "Γήπεδο Μπάσκετ" };
+        const suspectNamesGR = { "Makis": "Μάκης", "Nefeli": "Νεφέλη", "Litsa": "Κυρία Λίτσα", "Kserolas": "Καθ. Ξερόλας", "Nikos": "Νίκος", "Rania": "Ράνια" };
+        const weaponNamesGR = { "Pyrosvestiras": "Πυροσβεστήρας", "Metalliko_Thermos": "Μεταλλικό Θερμός", "Palio_Laptop": "Παλιό Λάπτοπ", "Marm_Sfragida": "Μαρμ. Σφραγίδα", "Foit_Taftotita": "Φοιτ. Ταυτότητα", "Vary_Syggramma": "Βαρύ Σύγγραμμα" };
+        const charColors = { "Makis": "#e67e22", "Litsa": "#9b59b6", "Nefeli": "#f1c40f", "Kserolas": "#2980b9", "Rania": "#e74c3c", "Nikos": "#1abc9c" };
+        const charFigures = { "Makis": "Makis.png", "Nefeli": "Nefeli.png", "Litsa": "Kyria_Litsa.png", "Kserolas": "Kath_Xerolas.png", "Nikos": "Nikos.png", "Rania": "Rania.png" };
+
+        const SUSPECTS = ["Makis", "Nefeli", "Litsa", "Kserolas", "Nikos", "Rania"];
+        const WEAPONS = ["Pyrosvestiras", "Metalliko_Thermos", "Palio_Laptop", "Marm_Sfragida", "Foit_Taftotita", "Vary_Syggramma"];
+        const ENTRANCES = [{"x":1031,"y":254,"w":20,"h":28}, {"x":874,"y":315,"w":16,"h":29}, {"x":874,"y":346,"w":16,"h":27}, {"x":503,"y":164,"w":22,"h":25}, {"x":530,"y":133,"w":23,"h":24}, {"x":768,"y":133,"w":27,"h":23}, {"x":789,"y":163,"w":23,"h":23}, {"x":242,"y":167,"w":19,"h":25}, {"x":1051,"y":154,"w":19,"h":38}, {"x":501,"y":485,"w":26,"h":31}, {"x":261,"y":539,"w":27,"h":20}, {"x":263,"y":567,"w":28,"h":19}, {"x":422,"y":317,"w":24,"h":22}, {"x":425,"y":343,"w":20,"h":24}];
+
+        const savedName = sessionStorage.getItem('pamak_username');
+        const savedChar = sessionStorage.getItem('pamak_character');
+        if (savedName && savedChar) socket.emit('join-game', { username: savedName, character: savedChar });
+        else window.location.href = 'character_selection.html';
+
+        socket.on('connect', () => { myId = socket.id; });
+
+        socket.on('init-grid', (tiles) => {
+            document.querySelectorAll('.grid-tile').forEach(el => el.remove());
+            tiles.forEach(tile => {
+                const div = document.createElement('div');
+                div.className = 'grid-tile';
+                if (ENTRANCES.some(e => tile.x === e.x && tile.y === e.y)) div.classList.add('entrance-tile');
+                div.style.left = tile.x + 'px'; div.style.top = tile.y + 'px'; div.style.width = tile.w + 'px'; div.style.height = tile.h + 'px';
+                board.appendChild(div);
+            });
+        });
+
+        socket.on('game-started-signal', (data) => {
+            isFirstTurn = true;
+            document.getElementById('board-container').classList.remove('pre-game-disabled');
+            document.getElementById('controls-ui').classList.remove('pre-game-disabled');
+            document.querySelector('.notebook-container').classList.remove('pre-game-disabled');
+            document.getElementById('setup-area').style.display = 'none';
+
+            const myHtml = `<h1 style="color: #2ecc71; font-size: 2.5rem;">🕵️ Το Μυστήριο Ξεκινά!</h1><p>Πρώτος/η παίζει: <strong>${data.firstPlayer}</strong></p>`;
+            queueCenterModal(myHtml, 5000);
+        });
+
+        socket.on('next-turn', (data) => {
+            const activePlayerId = data.id || data; 
+            const activePlayerName = data.name || "Κάποιος";
+            activePlayerIdGlobal = activePlayerId; 
+            roomOverlay.style.display = 'none';
+            hypBox.style.display = 'none';
+            document.getElementById('active-player-figure').style.display = 'none';
+            document.getElementById('speech-bubble').style.display = 'none';
+            lastKnownRoom = null;
+
+            isMyTurn = (activePlayerId === myId);
+            const accusationBtn = document.getElementById('open-accusation-btn');
+            if (accusationBtn) accusationBtn.style.display = 'flex';
+            
+            if (isMyTurn) {
+                turnIndicator.innerText = "🌟 ΕΙΝΑΙ Η ΣΕΙΡΑ ΣΟΥ!";
+                turnIndicator.style.backgroundColor = "rgba(241, 196, 15, 0.2)";
+                rollBtn.disabled = false;
+            } else {
+                turnIndicator.innerText = "⏳ Περίμενε τη σειρά σου...";
+                turnIndicator.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+                rollBtn.disabled = true;
+                clearPathHints();
+            }
+
+            if (!isFirstTurn) {
+                let myHtml = isMyTurn ? 
+                    `<h2 style="color: #2ecc71; font-size: 2.5rem;">🎲 Παίζεις εσύ!</h2>`:
+                    `<h2 style="color: #f1c40f; font-size: 1.8rem;">🔄 Αλλαγή Σειράς</h2><p>Τώρα παίζει ο/η <strong>${activePlayerName}</strong>.</p>`;
+                queueCenterModal(myHtml, 3000);
+            }
+            isFirstTurn = false;
+        });
+
+        rollBtn.onclick = () => { socket.emit('roll-dice'); rollBtn.disabled = true; };
+
+        socket.on('dice-result', (data) => {
+            if (data.id === myId) {
+                movesDisplay.innerText = `Κινήσεις: ${data.total}`;
+                showPathHints(data.moves);
+            }
+        });
+
+        socket.on('update-moves', (data) => {
+            movesDisplay.innerText = `Κινήσεις: ${data.remaining}`;
+            showPathHints(data.paths);
+            if (data.remaining === 0) clearPathHints();
+        });
+
+        function showPathHints(paths) {
+            clearPathHints();
+            paths.forEach(pos => {
+                const dot = document.createElement('div');
+                dot.className = 'move-dot';
+                if (ENTRANCES.some(e => pos.x >= e.x && pos.x <= e.x + e.w && pos.y >= e.y && pos.y <= e.y + e.h)) dot.classList.add('is-entrance');
+                dot.style.left = pos.x + 'px'; dot.style.top = pos.y + 'px';
+                board.appendChild(dot);
+            });
+        }
+        function clearPathHints() { document.querySelectorAll('.move-dot').forEach(d => d.remove()); }
+
+        socket.on('host-privileges', (data) => {
+            if (data.isHost) {
+                startBtn.style.display = 'inline-block';
+                startBtn.disabled = !data.canStart;
+                startBtn.innerText = data.canStart ? "🚀 Έναρξη Παιχνιδιού" : "⏳ Αναμονή (3-6 παίκτες)";
+            }
+        });
+
+        startBtn.onclick = () => socket.emit('start-game-request');
+
+        socket.on('receive-cards', (cards) => {
+            myCards = cards;
+            const display = document.getElementById('cards-display');
+            display.innerHTML = '';
+            cards.forEach(card => {
+                const img = document.createElement('img');
+                img.src = `images/cards/${card}.webp`;
+                img.className = 'card-image';
+                display.appendChild(img);
+                const checkbox = document.querySelector(`input[value="${card}"]`);
+                if (checkbox) {
+                    checkbox.checked = true; checkbox.disabled = true;
+                    checkbox.parentElement.style.color = "#888"; checkbox.parentElement.style.textDecoration = "line-through";
+                }
+            });
+            document.getElementById('my-hand-container').style.display = 'block';
+        });
+
+        socket.on('update-players', (players) => {
+            document.querySelectorAll('.pioni').forEach(p => p.remove());
+            labelsContainer.innerHTML = '';
+            const me = players[myId];
+            const activePlayer = players[activePlayerIdGlobal]; 
+            const accusationBtn = document.getElementById('open-accusation-btn');
+            
+            if (activePlayer) {
+                if (activePlayer.currentRoom && activePlayer.currentRoom !== lastKnownRoom) {
+                    document.getElementById('current-room-text').innerText = roomNamesGR[activePlayer.currentRoom] || activePlayer.currentRoom;
+                    roomOverlay.style.backgroundImage = `url('images/backgrounds/${activePlayer.currentRoom}.webp')`;
+                    roomOverlay.style.display = 'block';
+                    const figImg = document.getElementById('active-player-figure');
+                    const figFile = charFigures[activePlayer.character];
+                    if (figFile && figImg) { figImg.src = `images png/figoures png/${figFile}`; figImg.style.display = 'block'; }
+                    if (accusationBtn) accusationBtn.style.display = 'none';
+                    if (isMyTurn) { hypBox.style.display = 'block'; fillHypOptions(); } else { hypBox.style.display = 'none'; }
+                }
+                if (!activePlayer.currentRoom) { 
+                    roomOverlay.style.display = 'none'; hypBox.style.display = 'none'; 
+                    const figImg = document.getElementById('active-player-figure');
+                    if(figImg) figImg.style.display = 'none';
+                    document.getElementById('speech-bubble').style.display = 'none';
+                    if (accusationBtn) accusationBtn.style.display = 'flex';
+                }
+                lastKnownRoom = activePlayer.currentRoom;
+            }
+
+            if (me && isMyTurn) {
+                const isAtFouagie = (me.x === 647 && me.y === 315);
+                if (isAtFouagie) accusationBtn.classList.remove('disabled'); 
+                else accusationBtn.classList.add('disabled'); 
+            }
+
+            for (let id in players) {
+                const p = players[id];
+                const dot = document.createElement('div');
+                dot.className = 'pioni'; dot.style.left = p.x + 'px'; dot.style.top = p.y + 'px';
+                dot.style.backgroundColor = charColors[p.character] || '#e74c3c';
+                if (id === myId) { dot.style.border = "3px solid white"; dot.style.boxShadow = "0 0 15px white"; }
+                dot.innerText = p.name[0].toUpperCase();
+                board.appendChild(dot);
+                const lbl = document.createElement('div');
+                lbl.className = 'player-label'; lbl.style.background = charColors[p.character]; lbl.innerText = p.name;
+                labelsContainer.appendChild(lbl);
+            }
+        });
+
+        function fillHypOptions() {
+            const s = document.getElementById('hyp-suspect');
+            const w = document.getElementById('hyp-weapon');
+            s.innerHTML = ''; w.innerHTML = '';
+            SUSPECTS.forEach(x => s.add(new Option(suspectNamesGR[x] || x, x)));
+            WEAPONS.forEach(x => w.add(new Option(weaponNamesGR[x] || x, x)));
+        }
+
+        function autoExitRoom() {
+            roomOverlay.style.display = 'none'; hypBox.style.display = 'none';
+            socket.emit('finish-turn-from-room'); 
+        }
+
+        document.getElementById('submit-hyp-btn').onclick = () => {
+            socket.emit('make-hypothesis', { 
+                suspect: document.getElementById('hyp-suspect').value, 
+                weapon: document.getElementById('hyp-weapon').value 
+            });
+            hypBox.style.display = 'none';
+        };
+
+        // --- ΝΕΑ ΛΟΓΙΚΗ: ΤΟ ΣΥΝΝΕΦΑΚΙ ΜΠΑΙΝΕΙ ΣΤΗΝ ΟΥΡΑ ---
+        socket.on('global-announcement', (data) => {
+            const bubble = document.getElementById('speech-bubble');
+            const s_name = suspectNamesGR[data.suspect] || data.suspect;
+            const w_name = weaponNamesGR[data.weapon] || data.weapon;
+            const r_name = roomNamesGR[data.room] || data.room;
+
+            // 1. Εμφανίζουμε το συννεφάκι αμέσως (γιατί είναι μέρος του Room View)
+            bubble.innerHTML = `Ήταν ο/η <span style="color:#e74c3c">${s_name}</span> με το/τη <span style="color:#e74c3c">${w_name}</span> στο/στη <span style="color:#2980b9">${r_name}</span>;`;
+            bubble.style.display = 'block';
+
+            // 2. Προσθέτουμε μια «τεχνητή» καθυστέρηση στην ουρά
+            // Στέλνουμε κενό content για να μην βγει το κεντρικό modal, αλλά να σταματήσει η ροή για 4 δευτερόλεπτα
+            queueCenterModal("", 4000);
+        });
+
+        socket.on('request-disproof-choice', (data) => {
+            const modal = document.getElementById('disproof-choice-modal');
+            const container = document.getElementById('disproof-cards-container');
+            // Αυτό το modal είναι διαδραστικό, οπότε το βάζουμε στην ουρά με callback εμφάνισης
+            queueCenterModal("", 100, () => {
+                container.innerHTML = '';
+                modal.style.display = 'flex';
+                myCards.forEach(card => {
+                    const img = document.createElement('img');
+                    img.src = `images/cards/${card}.webp`;
+                    img.className = 'disproof-card-choice';
+                    if (!data.matches.includes(card)) img.classList.add('disabled');
+                    else img.onclick = () => { socket.emit('submit-disproof-card', card); modal.style.display = 'none'; };
+                    container.appendChild(img);
+                });
+            });
+        });
+
+        socket.on('hypothesis-result', (data) => {
+            const myHtml = `<h2>Ο/Η ${data.from} σου έδειξε:</h2><img src="images/cards/${data.card}.webp" style="width:200px; border:3px solid #f1c40f;">`;
+            queueCenterModal(myHtml, 5000, () => {
+                const checkbox = document.querySelector(`.notebook-container input[value="${data.card}"]`);
+                if (checkbox) checkbox.checked = true;
+                autoExitRoom();
+            });
+        });
+
+        socket.on('player-showed-card', (data) => {
+            if (isMyTurn) return;
+            const myHtml = `<h2 style="color: #27ae60;">✅ Δόθηκε Στοιχείο</h2><p>Ο/Η <strong>${data.responderName}</strong> έδειξε μια κάρτα στον/στην <strong>${data.askerName}</strong>.</p>`;
+            queueCenterModal(myHtml, 3000);
+        });
+
+        socket.on('no-disproof-available', (data) => {
+            const myHtml = `<h2 style="color: #f1c40f;">🔍 Αποτέλεσμα Έρευνας</h2><p>Κανείς δεν μπόρεσε να καταρρίψει την υπόθεση του/της <strong>${data.askerName}</strong>!</p>`;
+            queueCenterModal(myHtml, 4000, () => { if (isMyTurn) autoExitRoom(); });
+        });
+
+        socket.on('waiting-for-disproof', (data) => {
+            const myHtml = `<h2 style="color: #f1c40f;">⏳ Αναμονή Κατάρριψης</h2><p>Ο/Η ${data.responderName} σκέφτεται...</p><div class="loader"></div>`;
+            queueCenterModal(myHtml, 4000);
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (!isMyTurn || roomOverlay.style.display === 'block') return;
+            const keys = { 'ArrowUp': 'up', 'ArrowDown': 'down', 'ArrowLeft': 'left', 'ArrowRight': 'right' };
+            if (keys[e.key]) { e.preventDefault(); socket.emit('move', keys[e.key]); }
+        });
+
+        const accusationModal = document.getElementById('accusation-modal');
+        document.getElementById('open-accusation-btn').onclick = () => {
+            if (!isMyTurn) return;
+            accusationModal.style.display = 'block';
+            fillAccusationOptions();
+        };
+
+        function fillAccusationOptions() {
+            const s = document.getElementById('accuse-suspect');
+            const r = document.getElementById('accuse-room');
+            const w = document.getElementById('accuse-weapon');
+            s.innerHTML = ''; r.innerHTML = ''; w.innerHTML = '';
+            SUSPECTS.forEach(x => s.add(new Option(suspectNamesGR[x] || x, x)));
+            ["Gr_Katsoufi", "Toualetes", "Aith_Teleton", "Amfitheatro_12", "Vivliothiki", "Lesxi", "Grammateia", "KYD", "Gipedo_Basket"].forEach(x => r.add(new Option(roomNamesGR[x] || x, x)));
+            WEAPONS.forEach(x => w.add(new Option(weaponNamesGR[x] || x, x)));
+        }
+
+        document.getElementById('submit-accusation').onclick = () => {
+            if (confirm("Προσοχή: Αν κάνεις λάθος, χάνεις!")) {
+                socket.emit('make-accusation', { suspect: document.getElementById('accuse-suspect').value, room: document.getElementById('accuse-room').value, weapon: document.getElementById('accuse-weapon').value }); 
+                accusationModal.style.display = 'none';
+            }
+        };
+        document.getElementById('close-accusation').onclick = () => accusationModal.style.display = 'none';
+
+        socket.on('player-eliminated', (data) => {
+            // 1. Αυτόματη συμπλήρωση σημειωματάριου όλων των παικτών
+            data.playerCards.forEach(card => {
+                const checkbox = document.querySelector(`.notebook-container input[value="${card}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    checkbox.parentElement.style.color = "#e74c3c";
+                    checkbox.parentElement.style.textDecoration = "line-through";
+                }
+            });
+
+            const isMe = (data.playerId === myId); // Έλεγχος αν ο τοπικός παίκτης είναι ο ηττημένος
+            let myHtml = "";
+
+            if (isMe) {
+                // --- ΕΜΦΑΝΙΣΗ ΓΙΑ ΤΟΝ ΗΤΤΗΜΕΝΟ ---
+                // Μόνο το μήνυμα, χωρίς αναφορά στις κάρτες ή εμφάνιση αυτών
+                myHtml = `<h2 style="color:#e74c3c; margin:0;">❌ Λάθος κατηγορία! Αποκλειστήκατε.</h2>`;
+                
+                // Απενεργοποίηση ελέγχων
+                rollBtn.disabled = true;
+                const accusationBtn = document.getElementById('open-accusation-btn');
+                if (accusationBtn) accusationBtn.style.display = 'none';
+                isMyTurn = false;
+            } else {
+                // --- ΕΜΦΑΝΙΣΗ ΓΙΑ ΤΟΥΣ ΥΠΟΛΟΙΠΟΥΣ ---
+                // Δημιουργία HTML για τις κάρτες
+                let cardsHtml = '<div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:15px;">';
+                data.playerCards.forEach(cardName => {
+                    cardsHtml += `<img src="images/cards/${cardName}.webp" style="width:90px; border:2px solid #e74c3c; border-radius:5px; box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);">`;
+                });
+                cardsHtml += '</div>';
+
+                // Μήνυμα που περιλαμβάνει το όνομα του ηττημένου μετά το "του/της"
+                myHtml = `
+                    <h2 style="color:#e74c3c; margin:0;">💀 Ο/Η ${data.playerName} αποκλείστηκε!</h2>
+                    <p style="font-size:0.95rem; color:#bbb; margin-top: 10px;">Οι κάρτες του/της <strong>${data.playerName}</strong> αποκαλύφθηκαν και σημειώθηκαν στο μπλοκάκι σας:</p>
+                    ${cardsHtml}
+                `;
+            }
+            
+            // Εμφάνιση μέσω της ουράς ειδοποιήσεων
+            queueCenterModal(myHtml, 6000);
+        });
+
+        /* socket.on('player-eliminated', (data) => {
+            // 1. Αυτόματη συμπλήρωση σημειωματάριου όλων των παικτών
+            data.playerCards.forEach(card => {
+                const checkbox = document.querySelector(`.notebook-container input[value="${card}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    checkbox.parentElement.style.color = "#e74c3c";
+                    checkbox.parentElement.style.textDecoration = "line-through";
+                }
+            });
+            
+            // 2. Δημιουργία HTML για τις κάρτες του παίκτη που έχασε (με κόκκινο περίγραμμα και σκιά)
+            let cardsHtml = '<div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:15px;">';
+            data.playerCards.forEach(cardName => {
+                cardsHtml += `<img src="images/cards/${cardName}.webp" style="width:90px; border:2px solid #e74c3c; border-radius:5px; box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);">`;
+            });
+            cardsHtml += '</div>';
+
+            // 3. Διαχωρισμός μηνύματος: Αν έχασα εγώ ή κάποιος άλλος
+            let message = (data.playerId === myId) ? 
+                `<h2 style="color:#e74c3c; margin:0;">❌ Λάθος κατηγορία! Αποκλειστήκατε.</h2>` : 
+                `<h2 style="color:#e74c3c; margin:0;">💀 Ο/Η ${data.playerName} αποκλείστηκε!</h2>`;
+
+            const myHtml = `
+                ${message}
+                <p style="font-size:0.95rem; color:#bbb; margin-top: 10px;">Οι κάρτες του/της αποκαλύφθηκαν και σημειώθηκαν στο μπλοκάκι σας:</p>
+                ${cardsHtml}
+            `;
+            
+            // 4. Προσθήκη στην ουρά ειδοποιήσεων για 8 δευτερόλεπτα
+            queueCenterModal(myHtml, 8000);
+            
+            // 5. Αν έχασα εγώ, νεκρώνω το UI μου
+            if (data.playerId === myId) {
+                rollBtn.disabled = true;
+                const accusationBtn = document.getElementById('open-accusation-btn');
+                if (accusationBtn) accusationBtn.style.display = 'none';
+                isMyTurn = false;
+            }
+        }); */
+
+        /*socket.on('player-eliminated', (data) => {
+            data.playerCards.forEach(card => {
+                const cb = document.querySelector(`.notebook-container input[value="${card}"]`);
+                if (cb) { cb.checked = true; cb.parentElement.style.color = "#e74c3c"; }
+            });
+            let message = (data.playerId === myId) ? "❌ Αποκλειστήκατε!" : `Ο/Η ${data.playerName} αποκλείστηκε!`;
+            queueCenterModal(`<h2 style="color:#e74c3c;">${message}</h2>`, 8000);
+            if (data.playerId === myId) { rollBtn.disabled = true; document.getElementById('open-accusation-btn').style.display = 'none'; }
+        }); */
+
+        socket.on('game-over-victory', (data) => {
+            isGameOver = true;
+            let cardsHtml = '<div style="display:flex; justify-content:center; gap:15px; margin-top:20px;">';
+            data.envelope.forEach(c => cardsHtml += `<img src="images/cards/${c}.webp" style="width:120px; border:2px solid #f1c40f; border-radius:8px;">`);
+            cardsHtml += '</div>';
+            queueCenterModal(`<h1 style="color:#f1c40f;">🏆 ΝΙΚΗΤΗΣ!</h1><p>Ο/Η ${data.winner} κέρδισε!</p>${cardsHtml}`, 9999999);
+        });
+
+        socket.on('abandoned-cards-revealed', (data) => {
+            // 1. Αυτόματη συμπλήρωση σημειωματάριου με ΜΠΛΕ χρώμα
+            data.cards.forEach(cardName => {
+                const checkbox = document.querySelector(`.notebook-container input[value="${cardName}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    const labelElement = checkbox.parentElement; 
+                    labelElement.style.textDecoration = "line-through";
+                    labelElement.style.color = "royalblue"; // Μπλε χρώμα για κάρτες αποσυνδεδεμένου
+                    labelElement.style.fontWeight = "bold";
+                    labelElement.title = `Κάρτα από τον παίκτη ${data.playerName} που αποσυνδέθηκε`;
+                }
+            });
+
+            // 2. Δημιουργία HTML για τις κάρτες με μπλε περίγραμμα
+            let cardsHtml = '<div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:15px;">';
+            data.cards.forEach(cardName => {
+                cardsHtml += `<img src="images/cards/${cardName}.webp" style="width:90px; border:2px solid royalblue; border-radius:5px; box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);">`;
+            });
+            cardsHtml += '</div>';
+
+            // 3. Σύνθεση του μηνύματος για το "πάτωμα"
+            const myHtml = `
+            <h2 style="color: royalblue; margin:0;">🔌 Αποχώρηση Παίκτη!</h2>
+            <p style="font-size: 1.1rem; margin: 10px 0;">Ο/Η <strong>${data.playerName}</strong> αποσυνδέθηκε.</p>
+            <p style="font-size: 0.95rem; color: #bbb;">Οι κάρτες του/της βρέθηκαν πεταμένες στο πάτωμα και σημειώθηκαν στο μπλοκάκι σου:</p>
+            ${cardsHtml}
+            `;
+            
+            // Εμφάνιση στην ουρά ειδοποιήσεων
+            queueCenterModal(myHtml, 6000);
+        });
+
+        // --- ΑΝΑΒΑΘΜΙΣΜΕΝΟ: LISTENER ΓΙΑ ΤΟ ΚΑΚΟ ΤΕΛΟΣ (BAD ENDING) ---
+        socket.on('game-over-bad-ending', (data) => {
+            isGameOver = true; 
+            if (startBtn) startBtn.style.display = 'none'; 
+
+            // 1. ΝΕΚΡΩΜΑ & ΓΚΡΙΖΑΡΙΣΜΑ ΤΟΥ UI ΓΙΑ ΟΛΟΥΣ
+            const elementsToFreeze = [
+                document.getElementById('board-container'),
+                document.getElementById('controls-ui'),
+                document.querySelector('.notebook-container'),
+                document.getElementById('my-hand-container')
+            ];
+            
+            elementsToFreeze.forEach(el => {
+                if (el) {
+                    el.style.filter = 'grayscale(1) brightness(0.6)'; // Πιο σκοτεινό και ασπρόμαυρο
+                    el.style.pointerEvents = 'none';                // Κλείδωμα κλικ
+                    el.style.opacity = '0.6';                       // Ημιδιαφάνεια
+                    el.style.transition = 'all 2s ease-in-out';     // Πολύ αργή και δραματική μετάβαση
+                }
+            });
+
+            // 2. Δημιουργία των καρτών του φακέλου
+            let cardsHtml = '<div style="display:flex; justify-content:center; gap:15px; margin-top:20px;">';
+            data.envelope.forEach(cardName => {
+                cardsHtml += `<img src="images/cards/${cardName}.webp" style="width:120px; border:3px solid #e74c3c; border-radius:8px; box-shadow: 0 0 20px rgba(231,76,60,0.8);">`;
+            });
+            cardsHtml += '</div>';
+
+            // 3. Σύνθεση του τελικού μηνύματος
+            const myHtml = `
+            <h1 style="color:#e74c3c; font-size:3rem; margin-bottom:10px; text-shadow: 0 0 15px #000;">💀 GAME OVER</h1>
+            <p style="font-size:1.3rem; font-weight:bold;">Όλοι οι ντετέκτιβ απέτυχαν. Ο Δολοφόνος διέφυγε!</p>
+            <div style="background:rgba(0,0,0,0.6); padding:20px; margin:20px 0; border-radius:15px; border: 2px solid #e74c3c;">
+                <h4 style="margin-top:0; color:#e74c3c; font-size:1.2rem; letter-spacing:1px;">Η ΠΡΑΓΜΑΤΙΚΗ ΛΥΣΗ ΗΤΑΝ:</h4>
+                ${cardsHtml}
+            </div>
+            <p style="font-size:0.9rem; color:#888;">Η υπόθεση έκλεισε ανεξιχνίαστη.</p>
+            `;
+            
+            // Εμφάνιση στην ουρά ειδοποιήσεων
+            queueCenterModal(myHtml, 9999999);
+        });
+
+        socket.on('game-stopped-signal', () => {
+            // 1. Εφαρμογή των κλασικών κλάσεων απενεργοποίησης
+            document.getElementById('board-container').classList.add('pre-game-disabled');
+            document.getElementById('controls-ui').classList.add('pre-game-disabled');
+            document.querySelector('.notebook-container').classList.add('pre-game-disabled');
+
+            // 2. ΝΕΚΡΩΜΑ & ΓΚΡΙΖΑΡΙΣΜΑ του UI
+            const elementsToFreeze = [
+                document.getElementById('board-container'),
+                document.getElementById('controls-ui'),
+                document.querySelector('.notebook-container'),
+                document.getElementById('my-hand-container')
+            ];
+            
+            elementsToFreeze.forEach(el => {
+                if (el) {
+                    el.style.filter = 'grayscale(1) brightness(0.6)';
+                    el.style.pointerEvents = 'none';
+                    el.style.opacity = '0.6';
+                    el.style.transition = 'all 1.5s ease-in-out';
+                }
+            });
+
+            // Εμφάνιση του κουμπιού έναρξης αν χρειάζεται
+            if (document.getElementById('start-btn').style.display !== 'none') {
+                document.getElementById('setup-area').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

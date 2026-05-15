@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+    <meta name = "viewport" content = "width=device-width, initial-scale = 1.0" charset = "UTF-8">
+    
+<head>
+    <title> Big Red Button</title>
+    <style>
+        /* CSS resets for a clean start */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #e0e0e0; /* Neutral grey background */
+            font-family: Arial, sans-serif;
+            height: 100vh;
+        }
+
+        /* 1. THE BUTTON CONTAINER (Positioned Bottom Right) */
+        .industrial-button-container {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        /* 2. THE OUTER METAL BEZEL (The black/dark grey ring) */
+        .metal-bezel {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #444, #111); /* Subtle brushed effect */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* 3D shadows for the bezel itself */
+            box-shadow: 
+                0px 8px 15px rgba(0, 0, 0, 0.4), /* Drop shadow on the page */
+                inset 0px 2px 3px rgba(255, 255, 255, 0.2); /* Inner highlight */
+        }
+
+        /* 3. THE INNER RED BUTTON (The domed plastic part) */
+        .big-red-button {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: none;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+            outline: none;
+            position: relative;
+            
+            /* Powerful Red Gradient - No texture to keep it clean */
+            background: radial-gradient(circle at 35% 30%, #ff0000 0%, #cc0000 40%, #800000 100%);
+
+            /* 3D Shadows - Adjusted to avoid "grey" washout */
+            box-shadow: 
+                /* Subtle white highlight at the very top edge */
+                inset 0px 5px 8px rgba(255, 255, 255, 0.4), 
+                /* Deep shadow at the bottom to make it "pop" */
+                inset 0px -8px 15px rgba(0, 0, 0, 0.7),
+                /* Red internal glow to keep the color saturated */
+                inset 0px 0px 20px rgba(255, 0, 0, 0.3),
+                /* External shadow onto the bezel */
+                0px 5px 10px rgba(0, 0, 0, 0.5);
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s ease;
+        }
+
+        /* 4. THE GREEK TEXT (Specifically white and bold, without tonos) */
+        .button-text {
+            color: #ffffff;
+            font-family: 'Arial Black', Gadget, sans-serif;
+            font-weight: 900;
+            font-size: 13px; /* Slightly larger for readability */
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-shadow: 0px 2px 4px rgba(0, 0, 0, 0.8);
+            z-index: 2; /* Ensures text is above the gloss layer */
+        }
+
+        /* 5. BEHAVIORS (Click interaction) */
+        
+        /* Slight shrink effect on the whole component */
+        .industrial-button-container:active {
+            transform: scale(0.96);
+        }
+
+        /* Flatten the red dome shadow when pressed */
+        .industrial-button-container:active .big-red-button {
+            box-shadow: 
+                inset 0px 3px 5px rgba(255, 255, 255, 0.2), /* Reduce glint */
+                inset 0px -3px 5px rgba(0, 0, 0, 0.7), /* Increase depth shadow */
+                0px 1px 3px rgba(0, 0, 0, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="industrial-button-container">
+        <div class="metal-bezel">
+            <button class="big-red-button">
+                <span class="button-text">ΚΑΤΗΓΟΡΙΑ</span>
+            </button>
+        </div>
+    </div>
+</body>
+
+</html>
