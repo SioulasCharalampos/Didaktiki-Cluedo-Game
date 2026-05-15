@@ -253,8 +253,21 @@
         </div>
     </div>
 
+    <div id="stats-modal" style="display: none; position: fixed; z-index: 5000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; flex-direction: column;">
+        <div style="background: #2c3e50; padding: 30px; border: 4px solid #3498db; border-radius: 15px; text-align: center; color: white; width: 80%; max-width: 600px; box-shadow: 0 0 30px #3498db;">
+            <div id="stats-content"></div>
+            <button onclick="document.getElementById('stats-modal').style.display='none'" class="btn-active" style="margin-top:20px;">Κλείσιμο & Επιστροφή</button>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        // Μήνυμα αποτροπής κλεισίματος παραθύρου
+        window.addEventListener('beforeunload', (e) => {
+            e.preventDefault();
+            e.returnValue = '';
+        });
+
         const socket = io();
         const board = document.getElementById('board-container');
         const log = document.getElementById('game-log');
@@ -382,7 +395,10 @@
             isFirstTurn = false;
         });
 
-        rollBtn.onclick = () => { socket.emit('roll-dice'); rollBtn.disabled = true; };
+        rollBtn.onclick = () => { 
+            socket.emit('roll-dice'); 
+            rollBtn.disabled = true; // Προστασία από spamming
+        };
 
         socket.on('dice-result', (data) => {
             if (data.id === myId) {
@@ -472,7 +488,8 @@
             }
 
             if (me && isMyTurn) {
-                const isAtFouagie = (me.x === 647 && me.y === 315);
+                // BUG FIX 3: Έλεγχος ακτίνας για το Φουαγιέ (όχι ακριβές pixel)
+                const isAtFouagie = (me.x >= 617 && me.x <= 677 && me.y >= 285 && me.y <= 345);
                 if (isAtFouagie) accusationBtn.classList.remove('disabled'); 
                 else accusationBtn.classList.add('disabled'); 
             }
@@ -509,7 +526,11 @@
 
         document.getElementById('exit-room-view-btn').onclick = autoExitRoom;
 
-        document.getElementById('submit-hyp-btn').onclick = () => {
+        document.getElementById('submit-hyp-btn').onclick = function() {
+            // Προστασία από spamming πολλαπλών κλικ
+            this.disabled = true;
+            this.innerText = "Αποστολή...";
+
             if (visualTimerInterval) clearInterval(visualTimerInterval); 
             document.getElementById('hyp-timer-display').style.color = '#e74c3c'; 
             
@@ -518,6 +539,11 @@
                 weapon: document.getElementById('hyp-weapon').value 
             });
             hypBox.style.display = 'none';
+
+            setTimeout(() => {
+                this.disabled = false;
+                this.innerText = "Υποβολή";
+            }, 2000);
         };
 
         socket.on('global-announcement', (data) => {
@@ -761,6 +787,13 @@
             socket.emit('submit-quiz-answer', ans);
         }
 
+        // --- ΛΟΓΙΚΗ ΑΔΡΑΝΕΙΑΣ (AFK) ΣΤΟ QUIZ ---
+        socket.on('quiz-timeout-force-close', () => {
+            document.getElementById('quiz-category-modal').style.display = 'none';
+            document.getElementById('quiz-question-modal').style.display = 'none';
+            queueCenterModal(`<h2 style="color:#e74c3c;">⏰ Έληξε ο χρόνος!</h2><p>Καθυστέρησες πολύ και έχασες τη σειρά σου.</p>`, 4000);
+        });
+
         socket.on('quiz-result', (data) => {
             let html = '';
             if (data.success) {
@@ -798,6 +831,38 @@
             }
         });
 
+        // --- ΤΕΛΙΚΑ ΣΤΑΤΙΣΤΙΚΑ ΧΡΗΣΤΗ (LEARNING ANALYTICS) ---
+        socket.on('show-final-statistics', (data) => {
+            showStatsModal(data.history);
+        });
+
+        function showStatsModal(history) {
+            const statsModal = document.getElementById('stats-modal');
+            const statsContent = document.getElementById('stats-content');
+            
+            let statsHtml = `<h2>📊 Τα αποτελέσματά σου</h2><div style="text-align:left; max-height:400px; overflow-y:auto; background:rgba(0,0,0,0.5); padding:15px; border-radius:10px;">`;
+            
+            if (!history || history.length === 0) {
+                statsHtml += "<p style='text-align:center;'>Δεν απάντησες σε καμία ερώτηση σε αυτό το παιχνίδι.</p>";
+            } else {
+                history.forEach((item, index) => {
+                    const color = item.isCorrect ? "#2ecc71" : "#e74c3c";
+                    const icon = item.isCorrect ? "✅" : "❌";
+                    statsHtml += `
+                        <div style="border-bottom:1px solid #444; padding:10px; margin-bottom:10px;">
+                            <p style="margin:0 0 5px 0;"><strong>${index + 1}. ${item.question}</strong></p>
+                            <p style="color:${color}; margin:0 0 5px 0;">${icon} Απάντηση: ${item.playerAnswer} (Σωστό: ${item.correctAnswer})</p>
+                            <p style="font-size:0.9rem; color:#bbb; margin:0;">💡 ${item.explanation}</p>
+                        </div>
+                    `;
+                });
+            }
+            statsHtml += `</div>`;
+            
+            // Βάζουμε το HTML μέσα στο παράθυρο και το εμφανίζουμε ανεξάρτητα από την ουρά!
+            statsContent.innerHTML = statsHtml;
+            statsModal.style.display = 'flex'; 
+        }
     </script>
 </body>
 </html>

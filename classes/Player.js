@@ -16,6 +16,9 @@ class Player {
         this.currentRoom = null;
         this.isEliminated = false;
         
+        // Ιστορικό ερωτήσεων για τα στατιστικά στο τέλος
+        this.quizHistory = []; 
+
         // Σύνθεση (Composition): Κάθε παίκτης ΕΧΕΙ ένα Σημειωματάριο
         this.notebook = new Notebook(); 
     }
@@ -46,6 +49,20 @@ class Player {
 
     eliminate() {
         this.isEliminated = true;
+    }
+
+    /**
+     * Προσθήκη αποτελέσματος ερώτησης στο ιστορικό του παίκτη
+     */
+    addToHistory(questionData) {
+        this.quizHistory.push({
+            question: questionData.question,
+            playerAnswer: questionData.playerAnswer,
+            correctAnswer: questionData.correctAnswer,
+            isCorrect: questionData.isCorrect,
+            explanation: questionData.explanation,
+            timestamp: new Date().toLocaleTimeString('el-GR')
+        });
     }
 
     // Ο παίκτης δημιουργεί μια Υπόθεση

@@ -5,7 +5,7 @@ const Accusation = require('./Accusation');
 const networkQuestions = require('../questions_networks');
 const programmingQuestions = require('../questions_programming');
 const CrimeEnvelope = require('./CrimeEnvelope');
-const Deck = require('./Deck'); // <-- ΝΕΟ: Εισαγωγή της Τράπουλας
+const Deck = require('./Deck'); 
 
 class CluedoGame {
     constructor(io, board) {
@@ -16,7 +16,9 @@ class CluedoGame {
         this.occupiedCharacters = [];
         this.currentPlayerIndex = 0;
         this.isStarted = false;
-        this.activeQuiz = {}; // Αποθηκεύει την ερώτηση που περιμένει απάντηση
+        
+        this.activeQuiz = {}; 
+        this.quizTimerRef = {}; // Αποθηκεύει τα timers αδράνειας για το Quiz
         
         this.crimeEnvelope = null; 
         this.activeHypothesis = null;
@@ -45,7 +47,24 @@ class CluedoGame {
 
         if (!p || !correctQ) return;
 
-        if (answer === correctQ.correct) {
+        // Σταματάμε το χρονόμετρο αδράνειας αφού απάντησε
+        if (this.quizTimerRef[socket.id]) {
+            clearTimeout(this.quizTimerRef[socket.id]);
+            delete this.quizTimerRef[socket.id];
+        }
+
+        const isCorrect = (answer === correctQ.correct);
+
+        // ΝΕΟ: Αποθήκευση στο Ιστορικό του παίκτη
+        p.addToHistory({
+            question: correctQ.question,
+            playerAnswer: answer,
+            correctAnswer: correctQ.correct,
+            isCorrect: isCorrect,
+            explanation: correctQ.explanation
+        });
+
+        if (isCorrect) {
             delete this.activeQuiz[socket.id];
             // Ενημέρωση παίκτη και ξεκλείδωμα UI υπόθεσης
             this.io.to(socket.id).emit('quiz-result', { success: true, explanation: correctQ.explanation });
@@ -79,19 +98,11 @@ class CluedoGame {
     sendTurnSignal() {
         if (this.playerOrder.length > 0 && this.isStarted) {
             const activeId = this.playerOrder[this.currentPlayerIndex];
-            const activeName = this.players[activeId].name; // Παίρνουμε το όνομα του παίκτη
+            const activeName = this.players[activeId].name; 
             
-            // Στέλνουμε ως αντικείμενο το id ΚΑΙ το όνομα
             this.io.emit('next-turn', { id: activeId, name: activeName });
         }
     }
-
-    /*sendTurnSignal() {
-        if (this.playerOrder.length > 0 && this.isStarted) {
-            const activeId = this.playerOrder[this.currentPlayerIndex];
-            this.io.emit('next-turn', activeId);
-        }
-    }*/
 
     nextTurn() {
         this.clearHypTimer();
@@ -221,12 +232,15 @@ class CluedoGame {
         if (this.players[socket.id] && this.players[socket.id].isHost && this.playerOrder.length >= 3) {
             this.isStarted = true;
             
-            // Η Τράπουλα αναλαμβάνει το ανακάτεμα και το μοίρασμα
             const gameDeck = new Deck(Object.keys(this.board.getAllRooms()));
             const { envelope, remainingCards } = gameDeck.generateEnvelopeAndDeck();
             
             this.crimeEnvelope = new CrimeEnvelope(envelope.suspect, envelope.room, envelope.weapon);
-            
+            // Εκτύπωση της λύσης ΜΟΝΟ στο δικό σου τερματικό
+            console.log("==========================================");
+            console.log("🕵️ Η ΛΥΣΗ ΤΟΥ ΜΥΣΤΗΡΙΟΥ ΕΙΝΑΙ:");
+            console.log(this.crimeEnvelope);
+            console.log("==========================================");
             let i = 0;
             while (remainingCards.length > 0) {
                 this.players[this.playerOrder[i % this.playerOrder.length]].addCards([remainingCards.pop()]);
@@ -287,7 +301,6 @@ class CluedoGame {
             if (center) { checkX = center.x; checkY = center.y; }
         }
 
-        // Βρίσκουμε απλά το αμέσως επόμενο πλακάκι
         let bestTile = this.board.calculateTileInDirection(checkX, checkY, direction);
         
         if (bestTile) {
@@ -315,8 +328,17 @@ class CluedoGame {
                     socket.emit('update-moves', { remaining: 0, paths: [] });
                     this.io.emit('system-message', `📍 Ο/Η ${p.name} μπήκε στο δωμάτιο: ${enteredRoom}`);
         
-                    // ΝΕΟ: Ζητάμε από τον παίκτη να επιλέξει μάθημα πριν την υπόθεση
                     this.io.to(socket.id).emit('request-quiz-category');
+
+                    // ΝΕΟ: Ξεκινάμε το χρονόμετρο αδράνειας 30 δευτερολέπτων για το Quiz
+                    this.quizTimerRef[socket.id] = setTimeout(() => {
+                        if (this.activeQuiz[socket.id]) delete this.activeQuiz[socket.id];
+                        
+                        this.io.to(socket.id).emit('quiz-timeout-force-close');
+                        this.io.emit('system-message', `⏳ Ο/Η ${p.name} άργησε υπερβολικά στο Quiz και έχασε τη σειρά!`);
+                        
+                        this.nextTurn();
+                    }, 30000);
                 }
             } else {
                 if (!this.isTileOccupied(bestTile.center.x, bestTile.center.y, socket.id)) {
@@ -368,6 +390,16 @@ class CluedoGame {
         this.nextTurn();
     }
 
+    // Βοηθητική μέθοδος για την αποστολή των τελικών στατιστικών
+    sendFinalStats() {
+        this.playerOrder.forEach(id => {
+            const p = this.players[id];
+            if (p) {
+                this.io.to(id).emit('show-final-statistics', { history: p.quizHistory || [] });
+            }
+        });
+    }
+
     makeAccusation(socket, data) {
         if (!this.isStarted || socket.id !== this.playerOrder[this.currentPlayerIndex]) return;
     
@@ -382,10 +414,10 @@ class CluedoGame {
                 envelope: this.crimeEnvelope.getArrayFormat()
             });
             this.io.emit('game-stopped-signal'); 
+            this.sendFinalStats(); // Στέλνουμε τα στατιστικά
         } else { 
             p.eliminate(); 
             
-            // Μεταφέρουμε το πιόνι του ηττημένου εκτός οθόνης (για να αδειάσει το Φουαγιέ)
             p.x = -1000;
             p.y = -1000;
             p.currentRoom = null;
@@ -397,7 +429,6 @@ class CluedoGame {
             });
             this.io.emit('update-players', this.players); 
 
-            // Έλεγχος για "BAD ENDING"
             let activePlayersCount = 0;
             for (let id in this.players) {
                 if (!this.players[id].isEliminated) {
@@ -411,6 +442,7 @@ class CluedoGame {
                     envelope: this.crimeEnvelope.getArrayFormat()
                 });
                 this.io.emit('game-stopped-signal');
+                this.sendFinalStats(); // Στέλνουμε τα στατιστικά
             } else {
                 this.nextTurn(); 
             }
@@ -427,33 +459,30 @@ class CluedoGame {
         let turnNeedsAdvance = false;
         let delayNextTurn = false;
 
-        // 1. Καθαρισμός τυχόν ανοιχτών Timers & Quiz για αυτόν που έφυγε
         if (isCurrentTurn) this.clearHypTimer();
         if (this.activeQuiz[socketId]) delete this.activeQuiz[socketId];
+        if (this.quizTimerRef[socketId]) {
+            clearTimeout(this.quizTimerRef[socketId]);
+            delete this.quizTimerRef[socketId];
+        }
 
-        // 2. Έλεγχος Υπόθεσης (Αν κόπηκε στη μέση)
         if (this.activeHypothesis) {
             const totalPlayers = this.playerOrder.length;
             const responderIndex = (this.activeHypothesis.askerIndex + this.activeHypothesis.currentResponderOffset) % totalPlayers;
             const responderId = this.playerOrder[responderIndex];
             
-            // Ελέγχουμε αν έφυγε αυτός που ρωτούσε Ή αυτός που έπρεπε να απαντήσει
             if (socketId === this.activeHypothesis.player.id || socketId === responderId) {
                 this.io.emit('system-message', `⚠️ Η υπόθεση διακόπηκε επειδή ο/η ${leavingPlayer.name} αποσυνδέθηκε!`);
-                
-                // Στέλνουμε κενό disproof για να κλείσει το παράθυρο "Διάλεξε Κάρτα" αν είχε μείνει ανοιχτό σε κάποιον
                 this.io.emit('request-disproof-choice', { matches: [] }); 
                 
                 this.activeHypothesis = null;
                 turnNeedsAdvance = true;
-                delayNextTurn = true; // Βάζουμε καθυστέρηση για να διαβάσουν το μήνυμα
+                delayNextTurn = true; 
             }
         } else if (isCurrentTurn) {
-            // Αν έφυγε ενώ ήταν η σειρά του (και δεν έκανε υπόθεση), πρέπει να αλλάξει η σειρά
             turnNeedsAdvance = true;
         }
 
-        // 3. Διαγραφή από τις λίστες
         const char = leavingPlayer.character;
         this.occupiedCharacters = this.occupiedCharacters.filter(c => c !== char);
         
@@ -461,7 +490,6 @@ class CluedoGame {
         if (index > -1) {
             this.playerOrder.splice(index, 1);
             
-            // ΔΙΟΡΘΩΣΗ BUG ΣΕΙΡΑΣ: Ρυθμίζουμε τον δείκτη για να μην "πηδήξει" παίκτη!
             if (index < this.currentPlayerIndex) {
                 this.currentPlayerIndex--;
             } else if (index === this.currentPlayerIndex) {
@@ -472,7 +500,6 @@ class CluedoGame {
         
         delete this.players[socketId];
         
-        // 4. Έλεγχος για λήξη παιχνιδιού ή αποκάλυψη καρτών
         if (this.isStarted && this.playerOrder.length < 3) {
             this.isStarted = false; 
             this.playerOrder = []; 
@@ -481,14 +508,13 @@ class CluedoGame {
             this.activeHypothesis = null;
             this.io.emit('system-message', "⚠️ Το παιχνίδι ακυρώθηκε: Έμειναν λιγότεροι από 3 παίκτες.");
             this.io.emit('game-stopped-signal');
-            return; // Σταματάμε τη λειτουργία εδώ
+            this.sendFinalStats(); // Αποστολή στατιστικών ακόμα και σε ακύρωση
+            return; 
         } else if (this.isStarted && cardsToReveal.length > 0) {
-            // Ενημερώνουμε τα Σημειωματάρια των υπόλοιπων παικτών
             for (let id in this.players) {
                 cardsToReveal.forEach(card => this.players[id].learnCard(card));
             }
             
-            // Στέλνουμε το event για τις πεταμένες κάρτες
             this.io.emit('abandoned-cards-revealed', {
                 playerName: leavingPlayer.name,
                 cards: cardsToReveal
@@ -496,11 +522,9 @@ class CluedoGame {
             this.io.emit('system-message', `👻 Ο/Η ${leavingPlayer.name} έφυγε! Οι κάρτες του/της βρέθηκαν πεταμένες στο πάτωμα...`);
         }
 
-        // 5. Ενημέρωση UI
         this.updateHostStatus(); 
         this.io.emit('update-players', this.players); 
         
-        // 6. Ομαλή συνέχεια παιχνιδιού
         if (this.isStarted) {
             if (turnNeedsAdvance) {
                 if (delayNextTurn) {
@@ -509,7 +533,6 @@ class CluedoGame {
                     this.nextTurn();
                 }
             } else if (!this.activeHypothesis) {
-                // Υπενθύμιση στον τρέχοντα παίκτη ότι είναι ακόμα η σειρά του
                 this.sendTurnSignal();
             }
         }
