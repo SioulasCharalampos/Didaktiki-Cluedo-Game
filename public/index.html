@@ -268,7 +268,7 @@
             e.returnValue = '';
         });
 
-        const socket = io();
+        const socket = io({ transports: ['websocket'], upgrade: false });
         const board = document.getElementById('board-container');
         const log = document.getElementById('game-log');
         const startBtn = document.getElementById('start-btn');
@@ -600,10 +600,20 @@
             queueCenterModal(myHtml, 4000);
         });
 
+        let isMoving = false; // ΝΕΟ: Διακόπτης για να μην σπαμάρει κινήσεις
         window.addEventListener('keydown', (e) => {
-            if (!isMyTurn || roomOverlay.style.display === 'block') return;
+            if (!isMyTurn || roomOverlay.style.display === 'block' || isMoving) return;
+    
             const keys = { 'ArrowUp': 'up', 'ArrowDown': 'down', 'ArrowLeft': 'left', 'ArrowRight': 'right' };
-            if (keys[e.key]) { e.preventDefault(); socket.emit('move', keys[e.key]); }
+            if (keys[e.key]) { 
+                e.preventDefault(); 
+        
+                isMoving = true; // Κλειδώνουμε το πληκτρολόγιο
+                socket.emit('move', keys[e.key]); 
+        
+        // Το ξεκλειδώνουμε μετά από 150ms
+                setTimeout(() => { isMoving = false; }, 150);
+            }
         });
 
         const accusationModal = document.getElementById('accusation-modal');
