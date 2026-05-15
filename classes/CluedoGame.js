@@ -2,6 +2,8 @@
 const Player = require('./Player');
 const Hypothesis = require('./Hypothesis');
 const Accusation = require('./Accusation');
+const networkQuestions = require('../questions_networks');
+const programmingQuestions = require('../questions_programming');
 const CrimeEnvelope = require('./CrimeEnvelope');
 const Deck = require('./Deck'); // <-- ΝΕΟ: Εισαγωγή της Τράπουλας
 
@@ -14,12 +16,54 @@ class CluedoGame {
         this.occupiedCharacters = [];
         this.currentPlayerIndex = 0;
         this.isStarted = false;
+        this.activeQuiz = {}; // Αποθηκεύει την ερώτηση που περιμένει απάντηση
         
         this.crimeEnvelope = null; 
         this.activeHypothesis = null;
         this.hypTimerRef = null;
     }
 
+    // Επιλογή και αποστολή ερώτησης
+askEducationalQuestion(socketId, category) {
+    const pool = (category === 'networks') ? networkQuestions : programmingQuestions;
+    const randomQ = pool[Math.floor(Math.random() * pool.length)];
+    
+    this.activeQuiz[socketId] = randomQ; // Αποθήκευση στον server
+
+    this.io.to(socketId).emit('receive-quiz-question', {
+        question: randomQ.question,
+        options: randomQ.options
+    });
+}
+
+// Έλεγχος απάντησης
+handleQuizAnswer(socket, answer) {
+    const p = this.players[socket.id];
+    const correctQ = this.activeQuiz[socket.id];
+
+    if (!p || !correctQ) return;
+
+    if (answer === correctQ.correct) {
+        delete this.activeQuiz[socket.id];
+        // Ενημέρωση παίκτη και ξεκλείδωμα UI υπόθεσης
+        this.io.to(socket.id).emit('quiz-result', { success: true, explanation: correctQ.explanation });
+        this.io.to(socket.id).emit('unlock-hypothesis-ui');
+        
+        // Ξεκινάμε το timer της υπόθεσης μόνο αφού απάντησε σωστά
+        this.io.emit('start-hyp-timer', { id: socket.id, seconds: 60 });
+        this.hypTimerRef = setTimeout(() => {
+            this.io.emit('system-message', `⏰ Ο χρόνος του/της ${p.name} έληξε!`);
+            this.nextTurn();
+        }, 60000);
+    } else {
+        delete this.activeQuiz[socket.id];
+        this.io.to(socket.id).emit('quiz-result', { success: false, explanation: correctQ.explanation });
+        this.io.emit('system-message', `❌ Ο/Η ${p.name} απάντησε λάθος και χάνει τη σειρά του!`);
+        
+        // Ποινή: Τέλος σειράς
+        setTimeout(() => { this.nextTurn(); }, 3000);
+    }
+}
     clearHypTimer() {
         if (this.hypTimerRef) {
             clearTimeout(this.hypTimerRef);
@@ -257,10 +301,15 @@ class CluedoGame {
 
 
 
-            if (enteredRoom) {
-                const roomObj = this.board.getRoom(enteredRoom);
-                const slots = roomObj.getSlots();
-                const freeSlot = slots.find(s => !this.isTileOccupied(s.x, s.y, socket.id));
+            if (freeSlot) {
+                p.enterRoom(enteredRoom, freeSlot.x, freeSlot.y);
+                this.io.emit('update-players', this.players);
+                socket.emit('update-moves', { remaining: 0, paths: [] });
+                this.io.emit('system-message', `📍 Ο/Η ${p.name} μπήκε στο δωμάτιο: ${enteredRoom}`);
+    
+                 // ΝΕΟ: Ζητάμε από τον παίκτη να επιλέξει μάθημα πριν την υπόθεση
+                this.io.to(socket.id).emit('request-quiz-category');
+}
                 
                 if (freeSlot) {
                     p.enterRoom(enteredRoom, freeSlot.x, freeSlot.y);

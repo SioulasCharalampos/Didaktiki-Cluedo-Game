@@ -2,7 +2,7 @@
 <html lang="el">
 <head>
     <meta charset="UTF-8">
-    <title>ΠΑΜΑΚ Cluedo - Επιλογή Χαρακτήρα</title>
+    <title>University Cluedo - Επιλογή Χαρακτήρα</title>
     <link rel="stylesheet" href="style.css">
     <style>
         body {
@@ -93,8 +93,8 @@
 <body>
 
     <div id="login-screen">
-        <h1>🕵️ Επιχείρηση ΠΑΜΑΚ</h1>
-        <p>Μόλις ανέλαβες την πιο μυστήρια υπόθεση του Πανεπιστημίου.</p>
+        <h1>🕵️ Μυστήριο στο Πανεπιστήμιο: Cluedo Edition</h1>
+        <p>Μπορεί να είσαι πρωτοετης όμως μόλις ανέλαβες την πιο μυστήρια υπόθεση του Πανεπιστημίου.</p>
         <p>Όνομα Πράκτορα:</p>
         <input type="text" id="player-name" placeholder="π.χ. James Bond" style="padding: 12px; width: 80%; margin-bottom: 20px; border-radius: 5px; border: none;">
         <br>
@@ -102,8 +102,8 @@
     </div>
 
     <div id="intro-screen" style="display: none; background-color: rgba(0, 0, 0, 0.9); border: 3px solid #f1c40f; padding: 40px; border-radius: 15px; max-width: 800px; margin: 50px auto; text-align: center; color: white;">
-        <h1>Locked in PAMAK: The Final Grade</h1>
-        <p style="font-size: 1.1em; line-height: 1.6;">Παρασκευή βράδυ στο ΠΑΜΑΚ. Η μεγάλη εξέταση της
+        <h1>Locked in Uni: The First Semester</h1>
+        <p style="font-size: 1.1em; line-height: 1.6;">Παρασκευή βράδυ στο νέο σας Πανεπιστήμιο. Η μεγάλη εξέταση της
             «Αρχιτεκτονικής Συστημάτων» μόλις τελείωσε. Ο κ.
             Παγοκόφτης, ο καθηγητής που φημιζόταν για την
             αυστηρότητά του και τον μηδενισμό των γραπτών,
@@ -115,7 +115,8 @@
         <h2 style="color: #f1c40f;">The Mission:</h2>
         <p>Οι 6 παγιδευμένοι παίκτες πρέπει να ανακαλύψουν
             μέσω στοιχείων και υποθέσεων τη λύση του μυστηρίου
-            που κρύβεται στον «Φάκελο της Φύλακα».</p>
+            που κρύβεται στον «Φάκελο της Φύλακα» ενώ ταυτόχρονα πρέπει να απαντάνε
+            στις ερωτήσεις που θα κλειθούν να γνωρίζουν ώστε να μην πιαστουν αδιάβαστοι.</p>
         <br>
         <button id="start-game" class="btn-active" style="padding: 15px 40px;">Κατανόησα την Αποστολή</button>
     </div>
@@ -209,7 +210,7 @@
         // --- ΠΡΟΣΘΗΚΗ: ΚΛΕΙΔΩΜΑ ΕΙΣΟΔΟΥ ---
         socket.on('game-already-started', () => {
             alert("⚠️ Το παιχνίδι είναι ήδη σε εξέλιξη! Δεν μπορείτε να επιλέξετε χαρακτήρα αυτή τη στιγμή.");
-            //window.location.href = "https://www.uom.gr"; // Ανακατεύθυνση στο site του ΠΑΜΑΚ
+            
             document.body.innerHTML = `
             <div style="background: rgba(0,0,0,0.9); height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; font-family: sans-serif;">
                 <h1 style="color: #e74c3c;">🚫 ΕΙΣΟΔΟΣ ΑΠΑΓΟΡΕΥΕΤΑΙ</h1>
